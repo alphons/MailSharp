@@ -1,0 +1,25 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.14.36518.9 d17.14
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MailSharp.SmtpServer", "MailSharp.SmtpServer\MailSharp.SmtpServer.csproj", "{AAE64E3D-6369-4B4F-B8F0-25DF169F8244}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{AAE64E3D-6369-4B4F-B8F0-25DF169F8244}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{AAE64E3D-6369-4B4F-B8F0-25DF169F8244}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{AAE64E3D-6369-4B4F-B8F0-25DF169F8244}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{AAE64E3D-6369-4B4F-B8F0-25DF169F8244}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {16DD260B-DB77-4662-B6B1-42B834433054}
+	EndGlobalSection
+EndGlobal
