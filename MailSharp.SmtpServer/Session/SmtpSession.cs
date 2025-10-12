@@ -41,23 +41,23 @@ public partial class SmtpSession
 
 	private readonly TcpClient client;
 	private readonly IConfiguration configuration;
-	private readonly bool requireTls;
+	private readonly bool startTls;
 	private readonly bool useTls;
 	private SmtpState state;
 	private string? mailFrom;
 	private readonly List<string> rcptTo = [];
 	private readonly StringBuilder data = new();
-	private readonly StreamWriter writer;
-	private readonly StreamReader reader;
-	private readonly Stream stream;
+	private StreamWriter writer;
+	private StreamReader reader;
+	private Stream stream;
 	private readonly Dictionary<string, Func<string[], string, Task>> commandHandlers = [];
 
-	public SmtpSession(TcpClient client, IConfiguration configuration, bool requireTls, bool useTls)
+	public SmtpSession(TcpClient client, IConfiguration configuration, bool startTls, bool useTls)
 
 	{
 		this.client = client;
 		this.configuration = configuration;
-		this.requireTls = requireTls;
+		this.startTls = startTls;
 		this.useTls = useTls;
 		this.state = useTls ? SmtpState.TlsStarted : SmtpState.Initial;
 		this.stream = client.GetStream();

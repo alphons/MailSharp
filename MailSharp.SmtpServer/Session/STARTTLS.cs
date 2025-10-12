@@ -37,11 +37,11 @@ public partial class SmtpSession
 
 			SslStream sslStream = new(stream, false);
 			await sslStream.AuthenticateAsServerAsync(certificate, false, System.Security.Authentication.SslProtocols.Tls12 | System.Security.Authentication.SslProtocols.Tls13, false);
-			reader?.Dispose();
-			writer?.Dispose();
-			stream = sslStream;
-			reader = new StreamReader(stream, Encoding.ASCII);
-			writer = new StreamWriter(stream, Encoding.ASCII) { AutoFlush = true };
+			this.reader?.Dispose();
+			this.writer?.Dispose();
+			this.stream = sslStream;
+			this.reader = new StreamReader(this.stream, Encoding.ASCII);
+			this.writer = new StreamWriter(this.stream, Encoding.ASCII) { AutoFlush = true };
 
 			// Reset session as per RFC 3207
 			state = SmtpState.Initial;

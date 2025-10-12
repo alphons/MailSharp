@@ -11,7 +11,7 @@ public partial class SmtpSession
 			return;
 		}
 
-		if (requireTls && state != SmtpState.TlsStarted)
+		if (startTls && state != SmtpState.TlsStarted)
 		{
 			await writer!.WriteLineAsync(configuration["SmtpResponses:TlsRequired"]);
 			return;

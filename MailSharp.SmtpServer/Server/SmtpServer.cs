@@ -20,25 +20,25 @@ public class SmtpServer
 		foreach (var portConfig in ports)
 		{
 			var listener = new TcpListener(IPAddress.Parse(host), portConfig.Port);
-			listeners.Add((listener, portConfig.RequireTls, portConfig.UseTls));
+			listeners.Add((listener, portConfig.StartTls, portConfig.UseTls));
 		}
 	}
 
 	private class PortConfig
 	{
 		public int Port { get; set; }
-		public bool RequireTls { get; set; }
+		public bool StartTls { get; set; }
 		public bool UseTls { get; set; }
 	}
 
 	public async Task StartAsync(CancellationToken cancellationToken = default)
 	{
 		isRunning = true;
-		foreach (var (listener, requireTls, useTls) in listeners)
+		foreach (var (listener, startTls, useTls) in listeners)
 		{
 			listener.Start();
-			Console.WriteLine($"SMTP Server running on {listener.LocalEndpoint} (RequireTls: {requireTls}, UseTls: {useTls})");
-			_ = Task.Run(() => AcceptClientsAsync(listener, requireTls, useTls, cancellationToken), cancellationToken);
+			Console.WriteLine($"SMTP Server running on {listener.LocalEndpoint} (StartTls: {startTls}, UseTls: {useTls})");
+			_ = Task.Run(() => AcceptClientsAsync(listener, startTls, useTls, cancellationToken), cancellationToken);
 		}
 
 		try
@@ -53,14 +53,14 @@ public class SmtpServer
 		Stop();
 	}
 
-	private async Task AcceptClientsAsync(TcpListener listener, bool requireTls, bool useTls, CancellationToken cancellationToken)
+	private async Task AcceptClientsAsync(TcpListener listener, bool startTls, bool useTls, CancellationToken cancellationToken)
 	{
 		while (isRunning && !cancellationToken.IsCancellationRequested)
 		{
 			try
 			{
 				TcpClient client = await listener.AcceptTcpClientAsync(cancellationToken);
-				SmtpSession session = new(client, configuration, requireTls, useTls);
+				SmtpSession session = new(client, configuration, startTls, useTls);
 				_ = session.ProcessAsync(cancellationToken);
 			}
 			catch (OperationCanceledException)
