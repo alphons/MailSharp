@@ -8,19 +8,18 @@ namespace MailSharp.SmtpServer.Server;
 public class SmtpServer
 {
 	private readonly IConfiguration configuration;
-	private readonly List<(TcpListener Listener, bool RequireTls, bool UseTls)> listeners = [];
-	private bool isRunning = false;
+	private readonly List<(TcpListener Listener, bool StartTls, bool UseTls)> listeners = [];
+	private bool isRunning;
 
 	public SmtpServer(IConfiguration configuration)
 	{
 		this.configuration = configuration;
-		string host = configuration["SmtpSettings:Host"] ?? throw new InvalidOperationException("Host not configured in appsettings.json");
-		var ports = configuration.GetSection("SmtpSettings:Ports").Get<List<PortConfig>>() ?? throw new InvalidOperationException("Ports not configured in appsettings.json");
+		string host = configuration["SmtpSettings:Host"] ?? throw new InvalidOperationException("Host not configured");
+		var ports = configuration.GetSection("SmtpSettings:Ports").Get<List<PortConfig>>() ?? throw new InvalidOperationException("Ports not configured");
 
-		foreach (var portConfig in ports)
+		foreach (var port in ports)
 		{
-			var listener = new TcpListener(IPAddress.Parse(host), portConfig.Port);
-			listeners.Add((listener, portConfig.StartTls, portConfig.UseTls));
+			listeners.Add((new TcpListener(IPAddress.Parse(host), port.Port), port.StartTls, port.UseTls));
 		}
 	}
 
@@ -34,22 +33,12 @@ public class SmtpServer
 	public async Task StartAsync(CancellationToken cancellationToken = default)
 	{
 		isRunning = true;
-		foreach (var (listener, startTls, useTls) in listeners)
+		await Task.WhenAll(listeners.Select(l =>
 		{
-			listener.Start();
-			Console.WriteLine($"SMTP Server running on {listener.LocalEndpoint} (StartTls: {startTls}, UseTls: {useTls})");
-			_ = Task.Run(() => AcceptClientsAsync(listener, startTls, useTls, cancellationToken), cancellationToken);
-		}
-
-		try
-		{
-			await Task.Delay(Timeout.Infinite, cancellationToken);
-		}
-		catch (OperationCanceledException)
-		{
-			// Handled by Stop
-		}
-
+			l.Listener.Start();
+			Console.WriteLine($"SMTP Server running on {l.Listener.LocalEndpoint} (StartTls: {l.StartTls}, UseTls: {l.UseTls})");
+			return Task.Run(() => AcceptClientsAsync(l.Listener, l.StartTls, l.UseTls, cancellationToken), cancellationToken);
+		}));
 		Stop();
 	}
 
@@ -59,8 +48,8 @@ public class SmtpServer
 		{
 			try
 			{
-				TcpClient client = await listener.AcceptTcpClientAsync(cancellationToken);
-				SmtpSession session = new(client, configuration, startTls, useTls);
+				var client = await listener.AcceptTcpClientAsync(cancellationToken);
+				var session = new SmtpSession(client, configuration, startTls, useTls);
 				_ = session.ProcessAsync(cancellationToken);
 			}
 			catch (OperationCanceledException)
@@ -72,14 +61,11 @@ public class SmtpServer
 
 	public void Stop()
 	{
-		if (isRunning)
+		if (!isRunning) return;
+		isRunning = false;
+		foreach (var (listener, _, _) in listeners)
 		{
-			isRunning = false;
-			foreach (var (listener, _, _) in listeners)
-			{
-				listener.Stop();
-			}
-			listeners.Clear();
+			listener.Stop();
 		}
 	}
 }

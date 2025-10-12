@@ -16,29 +16,8 @@ public enum SmtpState
 	TlsStarted
 }
 
-// Class to manage individual client session
-
-
 public partial class SmtpSession
 {
-	private void InitializeHandlers()
-	{
-		commandHandlers.Add("HELO", HandleHeloAsync);
-		commandHandlers.Add("EHLO", HandleEhloAsync);
-		commandHandlers.Add("MAIL", HandleMailAsync);
-		commandHandlers.Add("RCPT", HandleRcptAsync);
-		commandHandlers.Add("DATA", HandleDataAsync);
-		commandHandlers.Add(".", HandleDataEndAsync);
-		commandHandlers.Add("QUIT", HandleQuitAsync);
-		commandHandlers.Add("NOOP", HandleNoopAsync);
-		commandHandlers.Add("RSET", HandleRsetAsync);
-		commandHandlers.Add("VRFY", HandleVrfyAsync);
-		commandHandlers.Add("EXPN", HandleExpnAsync);
-		commandHandlers.Add("HELP", HandleHelpAsync);
-		commandHandlers.Add("AUTH", HandleAuthAsync);
-		commandHandlers.Add("STARTTLS", HandleStartTlsAsync);
-	}
-
 	private readonly TcpClient client;
 	private readonly IConfiguration configuration;
 	private readonly bool startTls;
@@ -47,13 +26,12 @@ public partial class SmtpSession
 	private string? mailFrom;
 	private readonly List<string> rcptTo = [];
 	private readonly StringBuilder data = new();
-	private StreamWriter writer;
-	private StreamReader reader;
-	private Stream stream;
+	private readonly StreamWriter writer;
+	private readonly StreamReader reader;
+	private readonly Stream stream;
 	private readonly Dictionary<string, Func<string[], string, Task>> commandHandlers = [];
 
 	public SmtpSession(TcpClient client, IConfiguration configuration, bool startTls, bool useTls)
-
 	{
 		this.client = client;
 		this.configuration = configuration;
@@ -72,68 +50,72 @@ public partial class SmtpSession
 		}
 		this.reader = new StreamReader(stream, Encoding.ASCII);
 		this.writer = new StreamWriter(stream, Encoding.ASCII) { AutoFlush = true };
-
 		InitializeHandlers();
 	}
 
-	// Process client session
+	private void InitializeHandlers()
+	{
+		commandHandlers.Add("HELO", HandleHeloAsync);
+		commandHandlers.Add("EHLO", HandleEhloAsync);
+		commandHandlers.Add("MAIL", HandleMailAsync);
+		commandHandlers.Add("RCPT", HandleRcptAsync);
+		commandHandlers.Add("DATA", HandleDataAsync);
+		commandHandlers.Add(".", HandleDataEndAsync);
+		commandHandlers.Add("QUIT", HandleQuitAsync);
+		commandHandlers.Add("NOOP", HandleNoopAsync);
+		commandHandlers.Add("RSET", HandleRsetAsync);
+		commandHandlers.Add("VRFY", HandleVrfyAsync);
+		commandHandlers.Add("EXPN", HandleExpnAsync);
+		commandHandlers.Add("HELP", HandleHelpAsync);
+		commandHandlers.Add("AUTH", HandleAuthAsync);
+		commandHandlers.Add("STARTTLS", HandleStartTlsAsync);
+	}
+
 	public async Task ProcessAsync(CancellationToken cancellationToken)
 	{
-		await writer.WriteLineAsync(configuration["SmtpResponses:Ready"]);
-
-		int timeoutSeconds = configuration.GetValue<int>("SmtpSettings:CommandTimeoutSeconds");
-
-		InitializeHandlers();
-
-		while (client.Connected && !cancellationToken.IsCancellationRequested)
+		using (client)
+		using (stream)
+		using (reader)
+		using (writer)
 		{
-			using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(timeoutSeconds));
-			using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
+			await writer.WriteLineAsync(configuration["SmtpResponses:Ready"]);
+			int timeoutSeconds = configuration.GetValue<int>("SmtpSettings:CommandTimeoutSeconds");
 
-			try
+			while (client.Connected && !cancellationToken.IsCancellationRequested)
 			{
-				string? line = await reader.ReadLineAsync(linkedCts.Token);
-				if (line == null) break;
+				using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(timeoutSeconds));
+				using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
 
-				string[] parts = line.Split(' ');
-				string command = parts[0].ToUpper();
+				try
+				{
+					string? line = await reader.ReadLineAsync(linkedCts.Token);
+					if (line == null) return;
 
-				if (commandHandlers.TryGetValue(command, out var handler))
-				{
-					await handler(parts, line);
-				}
-				else if (state == SmtpState.DataStarted)
-				{
-					data.AppendLine(line);
-				}
-				else
-				{
-					await writer.WriteLineAsync(configuration["SmtpResponses:CommandNotRecognized"]);
-				}
+					string[] parts = line.Split(' ');
+					string command = parts[0].ToUpper();
 
-				if (command == "QUIT")
-				{
-					break;
+					if (commandHandlers.TryGetValue(command, out var handler))
+					{
+						await handler(parts, line);
+						if (command == "QUIT") return;
+					}
+					else if (state == SmtpState.DataStarted)
+					{
+						data.AppendLine(line);
+					}
+					else
+					{
+						await writer.WriteLineAsync(configuration["SmtpResponses:CommandNotRecognized"]);
+					}
 				}
-			}
-			catch (OperationCanceledException)
-			{
-				if (timeoutCts.Token.IsCancellationRequested)
+				catch (OperationCanceledException)
 				{
-					await writer.WriteLineAsync(configuration["SmtpResponses:Timeout"]);
+					await writer.WriteLineAsync(timeoutCts.Token.IsCancellationRequested
+						? configuration["SmtpResponses:Timeout"]
+						: configuration["SmtpResponses:Shutdown"]);
+					return;
 				}
-				else
-				{
-					await writer.WriteLineAsync(configuration["SmtpResponses:Shutdown"]);
-				}
-				break;
 			}
 		}
-		client.Close();
-		writer.Dispose();
-		reader.Dispose();
-		stream.Dispose();
-		client.Dispose();
 	}
 }
-
