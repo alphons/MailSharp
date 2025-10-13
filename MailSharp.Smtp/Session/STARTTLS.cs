@@ -1,5 +1,4 @@
 ﻿using MailSharp.Smtp.Extensions;
-using Microsoft.Extensions.Configuration;
 using System.Net.Security;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;

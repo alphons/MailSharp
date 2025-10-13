@@ -1,4 +1,4 @@
-﻿using MailSharp.Smtp.Server;
+﻿using MailSharp.Smtp.Extensions;
 using System.Net.Security;
 using System.Net.Sockets;
 using System.Security.Cryptography.X509Certificates;
@@ -6,13 +6,24 @@ using System.Text;
 
 namespace MailSharp.Smtp.Session;
 
+public enum SmtpState
+{
+	Initial,
+	HeloReceived,
+	MailFromReceived,
+	RcptToReceived,
+	DataStarted,
+	TlsStarted
+}
+
 public partial class SmtpSession
 {
 	private readonly TcpClient client;
 	private readonly IConfiguration configuration;
 	private readonly bool startTls;
 	private readonly bool useTls;
-	private readonly ILogger<SmtpServer> logger; // Toevoegen
+	private readonly ILogger<SmtpSession> logger;
+	private readonly long sessionId;
 	private SmtpState state;
 	private string? mailFrom;
 	private readonly List<string> rcptTo = [];
@@ -21,14 +32,16 @@ public partial class SmtpSession
 	private StreamReader reader;
 	private Stream stream;
 	private readonly Dictionary<string, Func<string[], string, CancellationToken, Task>> commandHandlers = [];
+	private static long nextSessionId = 0;
 
-	public SmtpSession(TcpClient client, IConfiguration configuration, bool startTls, bool useTls, ILogger<Server.SmtpServer> logger)
+	public SmtpSession(TcpClient client, IConfiguration configuration, bool startTls, bool useTls, ILogger<SmtpSession> logger)
 	{
 		this.client = client;
 		this.configuration = configuration;
 		this.startTls = startTls;
 		this.useTls = useTls;
-		this.logger = logger; // Initialiseren
+		this.logger = logger;
+		this.sessionId = Interlocked.Increment(ref nextSessionId);
 		this.state = useTls ? SmtpState.TlsStarted : SmtpState.Initial;
 		this.stream = client.GetStream();
 		if (this.useTls)
@@ -43,7 +56,12 @@ public partial class SmtpSession
 		this.reader = new StreamReader(stream, Encoding.ASCII);
 		this.writer = new StreamWriter(stream, Encoding.ASCII) { AutoFlush = true };
 		InitializeHandlers();
-		logger.LogInformation("New SMTP session started for client {ClientEndpoint}", client.Client.RemoteEndPoint); // Log verbinding
+		using (logger.BeginScope(new Dictionary<string, object> { ["SessionId"] = sessionId }))
+		{
+			var eventIdConfig = configuration.GetSection("SmtpEventIds:SessionStarted").Get<EventIdConfig>()
+				?? throw new InvalidOperationException("Missing SmtpEventIds:SessionStarted");
+			logger.LogInformation(new EventId(eventIdConfig.Id, eventIdConfig.Name), configuration["SmtpLogMessages:SessionStarted"], client.Client.RemoteEndPoint);
+		}
 	}
 
 	private void InitializeHandlers()
@@ -71,59 +89,76 @@ public partial class SmtpSession
 		using (reader)
 		using (writer)
 		{
-			await writer.WriteLineAsync(configuration["SmtpResponses:Ready"]);
+			await writer.WriteLineAsync(configuration["SmtpResponses:Ready"], cancellationToken);
 			int timeoutSeconds = configuration.GetValue<int>("SmtpSettings:CommandTimeoutSeconds");
 
-			while (client.Connected && !cancellationToken.IsCancellationRequested)
+			EventIdConfig eventIdConfig;
+
+			using (logger.BeginScope(new Dictionary<string, object> { ["SessionId"] = sessionId }))
 			{
-				using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(timeoutSeconds));
-				using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
-
-				try
+				while (client.Connected && !cancellationToken.IsCancellationRequested)
 				{
-					string? line = await reader.ReadLineAsync(linkedCts.Token);
-					if (line == null)
-					{
-						logger.LogWarning("Client {ClientEndpoint} disconnected", client.Client.RemoteEndPoint); // Log disconnect
-						return;
-					}
+					using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(timeoutSeconds));
+					using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
 
-					string[] parts = line.Split(' ');
-					string command = parts[0].ToUpper();
-					logger.LogInformation("Received command {Command} from {ClientEndpoint}", command, client.Client.RemoteEndPoint); // Log commando
-
-					if (commandHandlers.TryGetValue(command, out var handler))
+					try
 					{
-						await handler(parts, line, linkedCts.Token);
-						if (command == "QUIT")
+						string? line = await reader.ReadLineAsync(linkedCts.Token);
+						if (line == null)
 						{
-							logger.LogInformation("Session ended by QUIT command for {ClientEndpoint}", client.Client.RemoteEndPoint); // Log QUIT
+							eventIdConfig = configuration.GetSection("SmtpEventIds:ClientDisconnected").Get<EventIdConfig>()
+								?? throw new InvalidOperationException("Missing SmtpEventIds:ClientDisconnected");
+							logger.LogWarning(new EventId(eventIdConfig.Id, eventIdConfig.Name), configuration["SmtpLogMessages:ClientDisconnected"], client.Client.RemoteEndPoint);
 							return;
 						}
+
+						string[] parts = line.Split(' ');
+						string command = parts[0].ToUpper();
+						eventIdConfig = configuration.GetSection("SmtpEventIds:CommandReceived").Get<EventIdConfig>()
+							?? throw new InvalidOperationException("Missing SmtpEventIds:CommandReceived");
+						logger.LogInformation(new EventId(eventIdConfig.Id, eventIdConfig.Name), configuration["SmtpLogMessages:CommandReceived"], command, client.Client.RemoteEndPoint);
+
+						if (commandHandlers.TryGetValue(command, out var handler))
+						{
+							await handler(parts, line, linkedCts.Token);
+							if (command == "QUIT")
+							{
+								eventIdConfig = configuration.GetSection("SmtpEventIds:SessionEndedByQuit").Get<EventIdConfig>()
+									?? throw new InvalidOperationException("Missing SmtpEventIds:SessionEndedByQuit");
+								logger.LogInformation(new EventId(eventIdConfig.Id, eventIdConfig.Name), configuration["SmtpLogMessages:SessionEndedByQuit"], client.Client.RemoteEndPoint);
+								return;
+							}
+						}
+						else if (state == SmtpState.DataStarted)
+						{
+							data.AppendLine(line);
+						}
+						else
+						{
+							await writer.WriteLineAsync(configuration["SmtpResponses:CommandNotRecognized"], linkedCts.Token);
+							eventIdConfig = configuration.GetSection("SmtpEventIds:UnrecognizedCommand").Get<EventIdConfig>()
+								?? throw new InvalidOperationException("Missing SmtpEventIds:UnrecognizedCommand");
+							logger.LogWarning(new EventId(eventIdConfig.Id, eventIdConfig.Name), configuration["SmtpLogMessages:UnrecognizedCommand"], command, client.Client.RemoteEndPoint);
+						}
 					}
-					else if (state == SmtpState.DataStarted)
+					catch (OperationCanceledException)
 					{
-						data.AppendLine(line);
+						await writer.WriteLineAsync(timeoutCts.Token.IsCancellationRequested
+							? configuration["SmtpResponses:Timeout"]
+							: configuration["SmtpResponses:Shutdown"], linkedCts.Token);
+						eventIdConfig = configuration.GetSection("SmtpEventIds:SessionTerminated").Get<EventIdConfig>()
+							?? throw new InvalidOperationException("Missing SmtpEventIds:SessionTerminated");
+						logger.LogWarning(new EventId(eventIdConfig.Id, eventIdConfig.Name), configuration["SmtpLogMessages:SessionTerminated"],
+							timeoutCts.Token.IsCancellationRequested ? "timeout" : "shutdown", client.Client.RemoteEndPoint);
+						return;
 					}
-					else
+					catch (Exception ex)
 					{
-						await writer.WriteLineAsync(configuration["SmtpResponses:CommandNotRecognized"]);
-						logger.LogWarning("Unrecognized command {Command} from {ClientEndpoint}", command, client.Client.RemoteEndPoint); // Log onbekend commando
+						var eventIdConfig2 = configuration.GetSection("SmtpEventIds:CommandProcessingError").Get<EventIdConfig>()
+							?? throw new InvalidOperationException("Missing SmtpEventIds:CommandProcessingError");
+						logger.LogError(new EventId(eventIdConfig2.Id, eventIdConfig2.Name), ex, configuration["SmtpLogMessages:CommandProcessingError"], client.Client.RemoteEndPoint);
+						await writer.WriteLineAsync(configuration["SmtpResponses:CommandNotRecognized"], linkedCts.Token);
 					}
-				}
-				catch (OperationCanceledException)
-				{
-					await writer.WriteLineAsync(timeoutCts.Token.IsCancellationRequested
-						? configuration["SmtpResponses:Timeout"]
-						: configuration["SmtpResponses:Shutdown"]);
-					logger.LogWarning("Session terminated due to {Reason} for {ClientEndpoint}",
-						timeoutCts.Token.IsCancellationRequested ? "timeout" : "shutdown", client.Client.RemoteEndPoint); // Log timeout/shutdown
-					return;
-				}
-				catch (Exception ex)
-				{
-					logger.LogError(ex, "Error processing command for {ClientEndpoint}", client.Client.RemoteEndPoint); // Log fout
-					await writer.WriteLineAsync(configuration["SmtpResponses:CommandNotRecognized"]);
 				}
 			}
 		}

@@ -1,5 +1,5 @@
-﻿using Microsoft.Extensions.Configuration;
-using MailSharp.Smtp.Extensions;
+﻿using MailSharp.Smtp.Extensions;
+
 namespace MailSharp.Smtp.Session;
 
 public partial class SmtpSession
@@ -13,15 +13,15 @@ public partial class SmtpSession
 			return;
 		}
 		state = SmtpState.HeloReceived;
-		await writer.WriteLineAsync($"{configuration["SmtpResponses:EhloSupport"]}", ct);
+		await writer.WriteLineAsync(configuration["SmtpResponses:EhloSupport"], ct);
 		await writer.WriteLineAsync(string.Format(configuration["SmtpResponses:EhloSizeFormat"]!, configuration.GetValue<long>("SmtpSettings:MaxMessageSize")), ct);
 		if (configuration.GetValue<bool>("SmtpSettings:EnableAuth"))
 		{
-			await writer.WriteLineAsync("250-AUTH PLAIN CRAM-MD5 LOGIN", ct);
+			await writer.WriteLineAsync(configuration["SmtpResponses:AuthSupport"], ct);
 		}
 		if (configuration.GetValue<bool>("SmtpSettings:EnableStartTls"))
 		{
-			await writer.WriteLineAsync("250-STARTTLS", ct);
+			await writer.WriteLineAsync(configuration["SmtpResponses:StartTlsSupport"], ct);
 		}
 	}
 }
