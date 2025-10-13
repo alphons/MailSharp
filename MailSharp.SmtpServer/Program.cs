@@ -5,12 +5,12 @@ IConfiguration configuration = new ConfigurationBuilder()
 				.AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
 				.Build();
 
-using var cts = new CancellationTokenSource();
-Console.CancelKeyPress += (s, e) =>
+SmtpServer server = new(configuration);
+
+Console.CancelKeyPress += async (s, e) =>
 {
 	e.Cancel = true; // Prevent immediate termination
-	cts.Cancel();
+	await server.StopAsync();
 };
 
-SmtpServer server = new(configuration);
-await server.StartAsync(cts.Token);
+await server.StartAsync();

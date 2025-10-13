@@ -9,7 +9,7 @@ public class SmtpServer
 {
 	private readonly IConfiguration configuration;
 	private readonly List<(TcpListener Listener, bool StartTls, bool UseTls)> listeners = [];
-	private bool isRunning;
+	private CancellationTokenSource? cts;
 
 	public SmtpServer(IConfiguration configuration)
 	{
@@ -30,21 +30,29 @@ public class SmtpServer
 		public bool UseTls { get; set; }
 	}
 
-	public async Task StartAsync(CancellationToken cancellationToken = default)
+	public async Task StartAsync()
 	{
-		isRunning = true;
+		this.cts = new CancellationTokenSource();
+
 		await Task.WhenAll(listeners.Select(l =>
 		{
-			l.Listener.Start();
-			Console.WriteLine($"SMTP Server running on {l.Listener.LocalEndpoint} (StartTls: {l.StartTls}, UseTls: {l.UseTls})");
-			return Task.Run(() => AcceptClientsAsync(l.Listener, l.StartTls, l.UseTls, cancellationToken), cancellationToken);
+			try
+			{
+				l.Listener.Start();
+				Console.WriteLine($"SMTP Server running on {l.Listener.LocalEndpoint} (StartTls: {l.StartTls}, UseTls: {l.UseTls})");
+			}
+			catch (SocketException ex)
+			{
+				Console.WriteLine($"Failed to start listener on port {((IPEndPoint)l.Listener.LocalEndpoint).Port}: {ex.Message}");
+			}
+			return Task.Run(() => AcceptClientsAsync(l.Listener, l.StartTls, l.UseTls, this.cts.Token), this.cts.Token);
 		}));
-		Stop();
+		await StopAsync();
 	}
 
 	private async Task AcceptClientsAsync(TcpListener listener, bool startTls, bool useTls, CancellationToken cancellationToken)
 	{
-		while (isRunning && !cancellationToken.IsCancellationRequested)
+		while (!cancellationToken.IsCancellationRequested)
 		{
 			try
 			{
@@ -59,13 +67,15 @@ public class SmtpServer
 		}
 	}
 
-	public void Stop()
+	public async Task StopAsync()
 	{
-		if (!isRunning) return;
-		isRunning = false;
-		foreach (var (listener, _, _) in listeners)
+		if(cts != null)
+			await cts.CancelAsync();
+		foreach (var (tcplistener, _, _) in listeners)
 		{
-			listener.Stop();
+			tcplistener.Stop();
+			tcplistener.Dispose();
 		}
+		listeners.Clear();
 	}
 }
