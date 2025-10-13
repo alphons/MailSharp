@@ -6,6 +6,7 @@ using System.Text;
 
 namespace MailSharp.SmtpServer.Session;
 
+
 public enum SmtpState
 {
 	Initial,
@@ -26,10 +27,10 @@ public partial class SmtpSession
 	private string? mailFrom;
 	private readonly List<string> rcptTo = [];
 	private readonly StringBuilder data = new();
-	private readonly StreamWriter writer;
-	private readonly StreamReader reader;
-	private readonly Stream stream;
-	private readonly Dictionary<string, Func<string[], string, Task>> commandHandlers = [];
+	private StreamWriter writer;
+	private StreamReader reader;
+	private Stream stream;
+	private readonly Dictionary<string, Func<string[], string, CancellationToken, Task>> commandHandlers = [];
 
 	public SmtpSession(TcpClient client, IConfiguration configuration, bool startTls, bool useTls)
 	{
@@ -39,7 +40,7 @@ public partial class SmtpSession
 		this.useTls = useTls;
 		this.state = useTls ? SmtpState.TlsStarted : SmtpState.Initial;
 		this.stream = client.GetStream();
-		if (useTls)
+		if (this.useTls)
 		{
 			string certPath = configuration["SmtpSettings:CertificatePath"] ?? throw new InvalidOperationException("CertificatePath not configured");
 			string certPassword = configuration["SmtpSettings:CertificatePassword"] ?? string.Empty;
@@ -96,7 +97,7 @@ public partial class SmtpSession
 
 					if (commandHandlers.TryGetValue(command, out var handler))
 					{
-						await handler(parts, line);
+						await handler(parts, line, linkedCts.Token);
 						if (command == "QUIT") return;
 					}
 					else if (state == SmtpState.DataStarted)

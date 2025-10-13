@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.Configuration;
+﻿using MailSharp.SmtpServer.Extensions;
+using Microsoft.Extensions.Configuration;
 using System.Net.Security;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
@@ -8,27 +9,27 @@ namespace MailSharp.SmtpServer.Session;
 public partial class SmtpSession
 {
 	// Handle STARTTLS command
-	private async Task HandleStartTlsAsync(string[] parts, string line)
+	private async Task HandleStartTlsAsync(string[] parts, string line, CancellationToken ct)
 	{
 		if (!configuration.GetValue<bool>("SmtpSettings:EnableStartTls"))
 		{
-			await writer!.WriteLineAsync(configuration["SmtpResponses:CommandNotRecognized"]);
+			await writer.WriteLineAsync(configuration["SmtpResponses:CommandNotRecognized"], ct);
 			return;
 		}
 
 		if (state != SmtpState.HeloReceived)
 		{
-			await writer!.WriteLineAsync(configuration["SmtpResponses:BadSequence"]);
+			await writer.WriteLineAsync(configuration["SmtpResponses:BadSequence"], ct);
 			return;
 		}
 
 		if (state == SmtpState.TlsStarted)
 		{
-			await writer!.WriteLineAsync(configuration["SmtpResponses:StartTlsInvalid"]);
+			await writer.WriteLineAsync(configuration["SmtpResponses:StartTlsInvalid"], ct);
 			return;
 		}
 
-		await writer!.WriteLineAsync(configuration["SmtpResponses:StartTls"]);
+		await writer.WriteLineAsync(configuration["SmtpResponses:StartTls"], ct);
 		try
 		{
 			string certPath = configuration["SmtpSettings:CertificatePath"] ?? throw new InvalidOperationException("CertificatePath not configured");
@@ -51,7 +52,7 @@ public partial class SmtpSession
 		}
 		catch
 		{
-			await writer!.WriteLineAsync(configuration["SmtpResponses:StartTlsFailed"]);
+			await writer.WriteLineAsync(configuration["SmtpResponses:StartTlsFailed"], ct);
 			state = SmtpState.HeloReceived;
 		}
 	}

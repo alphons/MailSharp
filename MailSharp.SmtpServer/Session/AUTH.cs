@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.Configuration;
+﻿using MailSharp.SmtpServer.Extensions;
+using Microsoft.Extensions.Configuration;
 using System.Security.Cryptography;
 using System.Text;
 
@@ -7,29 +8,29 @@ namespace MailSharp.SmtpServer.Session;
 public partial class SmtpSession
 {
 	// Handle AUTH command
-	private async Task HandleAuthAsync(string[] parts, string line)
+	private async Task HandleAuthAsync(string[] parts, string line, CancellationToken ct)
 	{
 		if (!configuration.GetValue<bool>("SmtpSettings:EnableAuth"))
 		{
-			await writer!.WriteLineAsync(configuration["SmtpResponses:CommandNotRecognized"]);
+			await writer.WriteLineAsync(configuration["SmtpResponses:CommandNotRecognized"], ct);
 			return;
 		}
 
 		if (state != SmtpState.HeloReceived && state != SmtpState.TlsStarted)
 		{
-			await writer!.WriteLineAsync(configuration["SmtpResponses:BadSequence"]);
+			await writer.WriteLineAsync(configuration["SmtpResponses:BadSequence"], ct);
 			return;
 		}
 
 		if (startTls && state != SmtpState.TlsStarted)
 		{
-			await writer!.WriteLineAsync(configuration["SmtpResponses:TlsRequired"]);
+			await writer.WriteLineAsync(configuration["SmtpResponses:TlsRequired"], ct);
 			return;
 		}
 
 		if (parts.Length < 2)
 		{
-			await writer!.WriteLineAsync(configuration["SmtpResponses:SyntaxError"]);
+			await writer.WriteLineAsync(configuration["SmtpResponses:SyntaxError"], ct);
 			return;
 		}
 
@@ -37,10 +38,10 @@ public partial class SmtpSession
 		if (mechanism == "PLAIN")
 		{
 			// Handle AUTH PLAIN
-			string? credentials = parts.Length > 2 ? parts[2] : await reader!.ReadLineAsync();
+			string? credentials = parts.Length > 2 ? parts[2] : await reader.ReadLineAsync(ct);
 			if (credentials == null)
 			{
-				await writer!.WriteLineAsync(configuration["SmtpResponses:AuthFailed"]);
+				await writer.WriteLineAsync(configuration["SmtpResponses:AuthFailed"], ct);
 				return;
 			}
 
@@ -50,26 +51,26 @@ public partial class SmtpSession
 				string[] credentialParts = decoded.Split('\0');
 				if (credentialParts.Length != 3 || !ValidateCredentials(credentialParts[1], credentialParts[2]))
 				{
-					await writer!.WriteLineAsync(configuration["SmtpResponses:AuthFailed"]);
+					await writer.WriteLineAsync(configuration["SmtpResponses:AuthFailed"], ct);
 					return;
 				}
-				await writer!.WriteLineAsync(configuration["SmtpResponses:AuthSuccess"]);
+				await writer.WriteLineAsync(configuration["SmtpResponses:AuthSuccess"], ct);
 			}
 			catch
 			{
-				await writer!.WriteLineAsync(configuration["SmtpResponses:AuthFailed"]);
+				await writer.WriteLineAsync(configuration["SmtpResponses:AuthFailed"], ct);
 			}
 		}
 		else if (mechanism == "CRAM-MD5")
 		{
 			// Handle AUTH CRAM-MD5
 			string challenge = $"<{Guid.NewGuid()}.{DateTime.UtcNow.Ticks}@{configuration["SmtpSettings:Host"]}>";
-			await writer!.WriteLineAsync(string.Format(configuration["SmtpResponses:CramMd5Challenge"]!, Convert.ToBase64String(Encoding.UTF8.GetBytes(challenge))));
+			await writer.WriteLineAsync(string.Format(configuration["SmtpResponses:CramMd5Challenge"]!, Convert.ToBase64String(Encoding.UTF8.GetBytes(challenge))), ct);
 
-			string? response = await reader!.ReadLineAsync();
+			string? response = await reader.ReadLineAsync(ct);
 			if (response == null)
 			{
-				await writer!.WriteLineAsync(configuration["SmtpResponses:AuthFailed"]);
+				await writer.WriteLineAsync(configuration["SmtpResponses:AuthFailed"], ct);
 				return;
 			}
 
@@ -79,7 +80,7 @@ public partial class SmtpSession
 				string[] responseParts = decodedResponse.Split(' ');
 				if (responseParts.Length != 2)
 				{
-					await writer!.WriteLineAsync(configuration["SmtpResponses:AuthFailed"]);
+					await writer.WriteLineAsync(configuration["SmtpResponses:AuthFailed"], ct);
 					return;
 				}
 
@@ -88,32 +89,32 @@ public partial class SmtpSession
 				string? password = configuration[$"SmtpSettings:Credentials:{username}"];
 				if (password == null || !ValidateCramMd5(challenge, password, clientDigest))
 				{
-					await writer!.WriteLineAsync(configuration["SmtpResponses:AuthFailed"]);
+					await writer.WriteLineAsync(configuration["SmtpResponses:AuthFailed"], ct);
 					return;
 				}
-				await writer!.WriteLineAsync(configuration["SmtpResponses:AuthSuccess"]);
+				await writer.WriteLineAsync(configuration["SmtpResponses:AuthSuccess"], ct);
 			}
 			catch
 			{
-				await writer!.WriteLineAsync(configuration["SmtpResponses:AuthFailed"]);
+				await writer.WriteLineAsync(configuration["SmtpResponses:AuthFailed"], ct);
 			}
 		}
 		else if (mechanism == "LOGIN")
 		{
 			// Handle AUTH LOGIN
-			await writer!.WriteLineAsync(configuration["SmtpResponses:AuthLoginUsernamePrompt"]);
-			string? usernameBase64 = await reader!.ReadLineAsync();
+			await writer.WriteLineAsync(configuration["SmtpResponses:AuthLoginUsernamePrompt"], ct);
+			string? usernameBase64 = await reader.ReadLineAsync(ct);
 			if (usernameBase64 == null)
 			{
-				await writer!.WriteLineAsync(configuration["SmtpResponses:AuthFailed"]);
+				await writer.WriteLineAsync(configuration["SmtpResponses:AuthFailed"], ct);
 				return;
 			}
 
-			await writer!.WriteLineAsync(configuration["SmtpResponses:AuthLoginPasswordPrompt"]);
-			string? passwordBase64 = await reader!.ReadLineAsync();
+			await writer.WriteLineAsync(configuration["SmtpResponses:AuthLoginPasswordPrompt"], ct);
+			string? passwordBase64 = await reader.ReadLineAsync(ct);
 			if (passwordBase64 == null)
 			{
-				await writer!.WriteLineAsync(configuration["SmtpResponses:AuthFailed"]);
+				await writer.WriteLineAsync(configuration["SmtpResponses:AuthFailed"], ct);
 				return;
 			}
 
@@ -123,19 +124,19 @@ public partial class SmtpSession
 				string password = Encoding.UTF8.GetString(Convert.FromBase64String(passwordBase64));
 				if (!ValidateCredentials(username, password))
 				{
-					await writer!.WriteLineAsync(configuration["SmtpResponses:AuthFailed"]);
+					await writer.WriteLineAsync(configuration["SmtpResponses:AuthFailed"], ct);
 					return;
 				}
-				await writer!.WriteLineAsync(configuration["SmtpResponses:AuthSuccess"]);
+				await writer.WriteLineAsync(configuration["SmtpResponses:AuthSuccess"], ct);
 			}
 			catch
 			{
-				await writer!.WriteLineAsync(configuration["SmtpResponses:AuthFailed"]);
+				await writer.WriteLineAsync(configuration["SmtpResponses:AuthFailed"], ct);
 			}
 		}
 		else
 		{
-			await writer!.WriteLineAsync(configuration["SmtpResponses:SyntaxError"]);
+			await writer.WriteLineAsync(configuration["SmtpResponses:SyntaxError"], ct);
 		}
 	}
 

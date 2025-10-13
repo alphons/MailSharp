@@ -1,16 +1,16 @@
 ﻿using System.Net;
 using System.Text;
-
+using MailSharp.SmtpServer.Extensions;
 namespace MailSharp.SmtpServer.Session;
 
 public partial class SmtpSession
 {
 	// Handle end of DATA (.)
-	private async Task HandleDataEndAsync(string[] parts, string line)
+	private async Task HandleDataEndAsync(string[] parts, string line, CancellationToken ct)
 	{
 		if (state != SmtpState.DataStarted)
 		{
-			await writer!.WriteLineAsync(configuration["SmtpResponses:BadSequence"]);
+			await writer.WriteLineAsync(configuration["SmtpResponses:BadSequence"], ct);
 			return;
 		}
 		state = SmtpState.HeloReceived;
@@ -45,9 +45,9 @@ public partial class SmtpSession
 		string storagePath = configuration["SmtpSettings:EmlStoragePath"] ?? throw new InvalidOperationException("EmlStoragePath not configured");
 		Directory.CreateDirectory(storagePath);
 		string fileName = Path.Combine(storagePath, $"{Guid.NewGuid()}.eml");
-		await File.WriteAllTextAsync(fileName, emlContent.ToString());
+		await File.WriteAllTextAsync(fileName, emlContent.ToString(), ct);
 
-		await writer!.WriteLineAsync(configuration["SmtpResponses:MessageAccepted"]);
+		await writer.WriteLineAsync(configuration["SmtpResponses:MessageAccepted"], ct);
 		Console.WriteLine($"Saved message from {mailFrom} to {string.Join(", ", rcptTo)} as {fileName}");
 		mailFrom = null;
 		rcptTo.Clear();
