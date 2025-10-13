@@ -1,16 +1,15 @@
-﻿using MailSharp.SmtpServer.Server;
-using Microsoft.Extensions.Configuration;
+﻿using MailSharp.SmtpServer.Services;
 
-IConfiguration configuration = new ConfigurationBuilder()
-				.AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
-				.Build();
+var builder = WebApplication.CreateBuilder(args);
 
-SmtpServer server = new(configuration);
+builder.Host.UseWindowsService();
 
-Console.CancelKeyPress += async (s, e) =>
-{
-	e.Cancel = true; // Prevent immediate termination
-	await server.StopAsync();
-};
+builder.Services.AddControllers();
+builder.Services.AddHostedService<SmtpServerService>();
+builder.Services.AddSingleton<SmtpServerStatus>();
 
-await server.StartAsync();
+var app = builder.Build();
+
+app.MapControllers();
+
+await app.RunAsync();
