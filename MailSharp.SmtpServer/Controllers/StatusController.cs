@@ -1,7 +1,7 @@
-﻿using MailSharp.SmtpServer.Services;
+﻿using MailSharp.Smtp.Services;
 using Microsoft.AspNetCore.Mvc;
 
-namespace MailSharp.SmtpServer.Controllers;
+namespace MailSharp.Smtp.Controllers;
 
 // API controller for status
 [Route("api/[controller]")]

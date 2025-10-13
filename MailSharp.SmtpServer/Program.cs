@@ -1,4 +1,4 @@
-﻿using MailSharp.SmtpServer.Services;
+﻿using MailSharp.Smtp.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 

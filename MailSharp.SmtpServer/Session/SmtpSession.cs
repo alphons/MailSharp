@@ -1,21 +1,10 @@
-﻿using Microsoft.Extensions.Configuration;
+﻿using MailSharp.Smtp.Server;
 using System.Net.Security;
 using System.Net.Sockets;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
 
-namespace MailSharp.SmtpServer.Session;
-
-
-public enum SmtpState
-{
-	Initial,
-	HeloReceived,
-	MailFromReceived,
-	RcptToReceived,
-	DataStarted,
-	TlsStarted
-}
+namespace MailSharp.Smtp.Session;
 
 public partial class SmtpSession
 {
@@ -23,6 +12,7 @@ public partial class SmtpSession
 	private readonly IConfiguration configuration;
 	private readonly bool startTls;
 	private readonly bool useTls;
+	private readonly ILogger<SmtpServer> logger; // Toevoegen
 	private SmtpState state;
 	private string? mailFrom;
 	private readonly List<string> rcptTo = [];
@@ -32,12 +22,13 @@ public partial class SmtpSession
 	private Stream stream;
 	private readonly Dictionary<string, Func<string[], string, CancellationToken, Task>> commandHandlers = [];
 
-	public SmtpSession(TcpClient client, IConfiguration configuration, bool startTls, bool useTls)
+	public SmtpSession(TcpClient client, IConfiguration configuration, bool startTls, bool useTls, ILogger<Server.SmtpServer> logger)
 	{
 		this.client = client;
 		this.configuration = configuration;
 		this.startTls = startTls;
 		this.useTls = useTls;
+		this.logger = logger; // Initialiseren
 		this.state = useTls ? SmtpState.TlsStarted : SmtpState.Initial;
 		this.stream = client.GetStream();
 		if (this.useTls)
@@ -52,6 +43,7 @@ public partial class SmtpSession
 		this.reader = new StreamReader(stream, Encoding.ASCII);
 		this.writer = new StreamWriter(stream, Encoding.ASCII) { AutoFlush = true };
 		InitializeHandlers();
+		logger.LogInformation("New SMTP session started for client {ClientEndpoint}", client.Client.RemoteEndPoint); // Log verbinding
 	}
 
 	private void InitializeHandlers()
@@ -90,15 +82,24 @@ public partial class SmtpSession
 				try
 				{
 					string? line = await reader.ReadLineAsync(linkedCts.Token);
-					if (line == null) return;
+					if (line == null)
+					{
+						logger.LogWarning("Client {ClientEndpoint} disconnected", client.Client.RemoteEndPoint); // Log disconnect
+						return;
+					}
 
 					string[] parts = line.Split(' ');
 					string command = parts[0].ToUpper();
+					logger.LogInformation("Received command {Command} from {ClientEndpoint}", command, client.Client.RemoteEndPoint); // Log commando
 
 					if (commandHandlers.TryGetValue(command, out var handler))
 					{
 						await handler(parts, line, linkedCts.Token);
-						if (command == "QUIT") return;
+						if (command == "QUIT")
+						{
+							logger.LogInformation("Session ended by QUIT command for {ClientEndpoint}", client.Client.RemoteEndPoint); // Log QUIT
+							return;
+						}
 					}
 					else if (state == SmtpState.DataStarted)
 					{
@@ -107,6 +108,7 @@ public partial class SmtpSession
 					else
 					{
 						await writer.WriteLineAsync(configuration["SmtpResponses:CommandNotRecognized"]);
+						logger.LogWarning("Unrecognized command {Command} from {ClientEndpoint}", command, client.Client.RemoteEndPoint); // Log onbekend commando
 					}
 				}
 				catch (OperationCanceledException)
@@ -114,7 +116,14 @@ public partial class SmtpSession
 					await writer.WriteLineAsync(timeoutCts.Token.IsCancellationRequested
 						? configuration["SmtpResponses:Timeout"]
 						: configuration["SmtpResponses:Shutdown"]);
+					logger.LogWarning("Session terminated due to {Reason} for {ClientEndpoint}",
+						timeoutCts.Token.IsCancellationRequested ? "timeout" : "shutdown", client.Client.RemoteEndPoint); // Log timeout/shutdown
 					return;
+				}
+				catch (Exception ex)
+				{
+					logger.LogError(ex, "Error processing command for {ClientEndpoint}", client.Client.RemoteEndPoint); // Log fout
+					await writer.WriteLineAsync(configuration["SmtpResponses:CommandNotRecognized"]);
 				}
 			}
 		}

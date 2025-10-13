@@ -1,10 +1,10 @@
-﻿using MailSharp.SmtpServer.Extensions;
+﻿using MailSharp.Smtp.Extensions;
 using Microsoft.Extensions.Configuration;
 using System.Net.Security;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
 
-namespace MailSharp.SmtpServer.Session;
+namespace MailSharp.Smtp.Session;
 
 public partial class SmtpSession
 {
