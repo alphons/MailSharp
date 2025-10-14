@@ -1,4 +1,6 @@
-﻿namespace MailSharp.Smtp.Services;
+﻿using MailSharp.Smtp.Server;
+
+namespace MailSharp.Smtp.Services;
 
 public class SmtpServerStatus
 {
@@ -14,7 +16,7 @@ public class SmtpServerService(IConfiguration configuration,
 	DkimVerifier dkimVerifier,
 	SmtpServerStatus status) : BackgroundService
 {
-	private readonly Server.SmtpServer server = new (configuration, serverLogger, sessionLogger, dkimSigner, spfChecker, dkimVerifier);
+	private readonly SmtpServer server = new (configuration, serverLogger, sessionLogger, dkimSigner, spfChecker, dkimVerifier);
 
 	protected override async Task ExecuteAsync(CancellationToken stoppingToken)
 	{
