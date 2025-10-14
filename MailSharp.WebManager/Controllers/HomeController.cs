@@ -3,13 +3,20 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace MailSharp.WebManager.Controllers;
 
-// API controller for status
-[Route("~/")]
-public class HomeController(SmtpServerStatus status) : ControllerBase
+//public class HomeControllerOld(SmtpServerStatus status) : ControllerBase
+//{
+//	[HttpGet]
+//	public IActionResult Index()
+//	{
+//		return Ok(new { SmtpRunning = status.IsRunning });
+//	}
+//}
+
+public class HomeController : Controller
 {
-	[HttpGet]
+	// GET: Home/Index
 	public IActionResult Index()
 	{
-		return Ok(new { SmtpRunning = status.IsRunning });
+		return View("/wwwroot/Index.cshtml");
 	}
 }
