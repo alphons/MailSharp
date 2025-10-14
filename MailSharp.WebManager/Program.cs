@@ -52,5 +52,5 @@ app.MapControllerRoute(
 	pattern: "{controller=Home}/{action=Index}/{id?}");
 
 //app.MapControllers();
-
+app.MapRazorPages();
 await app.RunAsync();

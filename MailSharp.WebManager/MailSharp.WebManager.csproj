@@ -7,6 +7,14 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Content Remove="wwwroot\Index.cshtml.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="wwwroot\Index.cshtml.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\MailSharp.Smtp\MailSharp.Smtp.csproj" />
   </ItemGroup>
 
@@ -14,7 +22,6 @@
 		<PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" Version="9.0.9" />
 		<PackageReference Include="Microsoft.Extensions.Identity.Core" Version="9.0.9" />
 	</ItemGroup>
-
 
 	<ItemGroup>
     <None Update="certificate.pfx">

@@ -1,16 +1,26 @@
-﻿
+﻿using MailSharp.WebManager.Controllers;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
+using static System.Runtime.InteropServices.JavaScript.JSType;
 
-namespace MailSharp.WebManager.Controllers;
+namespace MailSharp.WebManager.wwwroot;
 
 [Route("api/[controller]")]
 [ApiController]
-public class AuthController(IConfiguration configuration) : ControllerBase
+public class AuthController(IConfiguration configuration) : Controller
 {
+	[HttpGet("~/")]
+	public IActionResult Index() => View("/wwwroot/Index.cshtml");
+
+	[HttpGet("~/Account/Login")]
+	public IActionResult LoginPage() => View("/wwwroot/Account/Login.cshtml");
+
+	[HttpGet("~/Account/AccessDenied")]
+	public IActionResult AccessDenied() => View("/wwwroot/Account/AccessDenied.cshtml");
+
 	// POST: api/auth/login
 	[HttpPost("login")]
 	public async Task<IActionResult> Login()
@@ -22,6 +32,8 @@ public class AuthController(IConfiguration configuration) : ControllerBase
 		var users = configuration.GetSection("Users").Get<List<UserConfig>>();
 		var user = users?.FirstOrDefault(u => u.UserName == username && u.Password == password);
 
+		TempData["ErrorMessage"] = "";
+
 		if (user != null)
 		{
 			// Add claims including role
@@ -32,17 +44,19 @@ public class AuthController(IConfiguration configuration) : ControllerBase
 				new Claim(ClaimTypes.Role, user.Role ?? "User") // Add role claim
             ];
 			var claimsIdentity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
-			var authProperties = new AuthenticationProperties 
-			{ 
+			var authProperties = new AuthenticationProperties
+			{
 				IsPersistent = true,
 				ExpiresUtc = DateTimeOffset.UtcNow.AddDays(user.ExpireDays)
 			};
 
 			await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, new ClaimsPrincipal(claimsIdentity), authProperties);
-			return RedirectToAction("Index", "Home");
-		}
 
-		return RedirectToAction("Login", "Account", new { error = "Invalid login attempt" });
+			return RedirectToAction("Index", "Auth");
+		}
+		TempData["ErrorMessage"] = "Invalid login attempt";
+
+		return RedirectToAction("LoginPage", "Auth");
 	}
 
 	// GET: api/auth/logout
@@ -50,7 +64,8 @@ public class AuthController(IConfiguration configuration) : ControllerBase
 	public async Task<IActionResult> Logout()
 	{
 		await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
-		return RedirectToAction("Login", "Account");
+
+		return RedirectToAction("LoginPage", "Auth");
 	}
 
 	// GET: api/auth/protected

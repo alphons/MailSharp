@@ -1,5 +1,4 @@
-﻿@model dynamic
-@{
+﻿@{
 	ViewData["Title"] = "Login";
 }
 
@@ -102,9 +101,10 @@
 <body>
 	<div class="login-container">
 		<h1>Login</h1>
-		@if (!string.IsNullOrEmpty(ViewData["ErrorMessage"] as string))
+		
+		@if (!string.IsNullOrEmpty(TempData["ErrorMessage"] as string))
 		{
-			<p class="error">@ViewData["ErrorMessage"]</p>
+			<p class="error">@TempData["ErrorMessage"]</p>
 		}
 		<form method="post" action="/api/auth/login">
 			<div class="form-group">
