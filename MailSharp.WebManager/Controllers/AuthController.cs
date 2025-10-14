@@ -35,7 +35,7 @@ public class AuthController(IConfiguration configuration) : ControllerBase
 			var authProperties = new AuthenticationProperties 
 			{ 
 				IsPersistent = true,
-				ExpiresUtc = DateTimeOffset.UtcNow.AddYears(1)
+				ExpiresUtc = DateTimeOffset.UtcNow.AddDays(user.ExpireDays)
 			};
 
 			await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, new ClaimsPrincipal(claimsIdentity), authProperties);
@@ -71,4 +71,5 @@ public class UserConfig
 	public string? UserName { get; set; }
 	public string? Password { get; set; }
 	public string? Role { get; set; }
+	public int ExpireDays { get; set; } = 365;
 }
