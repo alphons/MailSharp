@@ -5,9 +5,16 @@ public class SmtpServerStatus
 	public bool IsRunning { get; set; }
 }
 
-public class SmtpServerService(IConfiguration configuration, ILogger<SmtpServerService> logger, ILogger<Server.SmtpServer> serverLogger, ILogger<Session.SmtpSession> sessionLogger, SmtpServerStatus status) : BackgroundService
+public class SmtpServerService(IConfiguration configuration, 
+	ILogger<SmtpServerService> logger, 
+	ILogger<Server.SmtpServer> serverLogger, 
+	ILogger<Session.SmtpSession> sessionLogger,
+	DkimSigner dkimSigner,
+	SpfChecker spfChecker, 
+	DkimVerifier dkimVerifier,
+	SmtpServerStatus status) : BackgroundService
 {
-	private readonly Server.SmtpServer server = new (configuration, serverLogger, sessionLogger);
+	private readonly Server.SmtpServer server = new (configuration, serverLogger, sessionLogger, dkimSigner, spfChecker, dkimVerifier);
 
 	protected override async Task ExecuteAsync(CancellationToken stoppingToken)
 	{

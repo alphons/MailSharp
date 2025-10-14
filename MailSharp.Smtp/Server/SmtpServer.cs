@@ -1,4 +1,5 @@
-﻿using MailSharp.Smtp.Session;
+﻿using MailSharp.Smtp.Services;
+using MailSharp.Smtp.Session;
 using System.Net;
 using System.Net.Sockets;
 
@@ -9,6 +10,9 @@ public class SmtpServer
 	private readonly IConfiguration configuration;
 	private readonly ILogger<SmtpServer> logger;
 	private readonly ILogger<SmtpSession> sessionLogger;
+	private readonly DkimSigner dkimSigner;
+	private readonly SpfChecker spfChecker;
+	private readonly DkimVerifier dkimVerifier;
 	private readonly List<(TcpListener Listener, bool StartTls, bool UseTls)> listeners = [];
 	private CancellationTokenSource? cts;
 
@@ -19,11 +23,19 @@ public class SmtpServer
 		public bool UseTls { get; set; }
 	}
 
-	public SmtpServer(IConfiguration configuration, ILogger<SmtpServer> logger, ILogger<SmtpSession> sessionLogger)
+	public SmtpServer(IConfiguration configuration, 
+		ILogger<SmtpServer> logger, 
+		ILogger<SmtpSession> sessionLogger,
+		DkimSigner dkimSigner, 
+		SpfChecker spfChecker, 
+		DkimVerifier dkimVerifier)
 	{
 		this.configuration = configuration;
 		this.logger = logger;
 		this.sessionLogger = sessionLogger;
+		this.dkimSigner = dkimSigner;
+		this.spfChecker = spfChecker;
+		this.dkimVerifier = dkimVerifier;
 		string host = configuration["SmtpSettings:Host"] ?? throw new InvalidOperationException("Host not configured");
 		var ports = configuration.GetSection("SmtpSettings:Ports").Get<List<PortConfig>>() ?? throw new InvalidOperationException("Ports not configured");
 
@@ -67,7 +79,7 @@ public class SmtpServer
 				var eventIdConfig = configuration.GetSection("SmtpEventIds:ClientAccepted").Get<EventIdConfig>()
 					?? throw new InvalidOperationException("Missing SmtpEventIds:ClientAccepted");
 				logger.LogInformation(new EventId(eventIdConfig.Id, eventIdConfig.Name), configuration["SmtpLogMessages:ClientAccepted"], client.Client.RemoteEndPoint);
-				var session = new SmtpSession(client, configuration, startTls, useTls, sessionLogger);
+				var session = new SmtpSession(client, configuration, startTls, useTls, dkimSigner, spfChecker, dkimVerifier, sessionLogger);
 				_ = session.ProcessAsync(cancellationToken);
 			}
 			catch (OperationCanceledException)

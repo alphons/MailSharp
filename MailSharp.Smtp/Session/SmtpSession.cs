@@ -1,4 +1,5 @@
 ﻿using MailSharp.Smtp.Extensions;
+using MailSharp.Smtp.Services;
 using System.Net.Security;
 using System.Net.Sockets;
 using System.Security.Cryptography.X509Certificates;
@@ -33,13 +34,19 @@ public partial class SmtpSession
 	private Stream stream;
 	private readonly Dictionary<string, Func<string[], string, CancellationToken, Task>> commandHandlers = [];
 	private static long nextSessionId = 0;
+	private readonly DkimSigner dkimSigner;
+	private readonly SpfChecker spfChecker;
+	private readonly DkimVerifier dkimVerifier;
 
-	public SmtpSession(TcpClient client, IConfiguration configuration, bool startTls, bool useTls, ILogger<SmtpSession> logger)
+	public SmtpSession(TcpClient client, IConfiguration configuration, bool startTls, bool useTls, DkimSigner dkimSigner, SpfChecker spfChecker, DkimVerifier dkimVerifier, ILogger<SmtpSession> logger)
 	{
 		this.client = client;
 		this.configuration = configuration;
 		this.startTls = startTls;
 		this.useTls = useTls;
+		this.dkimSigner = dkimSigner;
+		this.spfChecker = spfChecker;
+		this.dkimVerifier = dkimVerifier;
 		this.logger = logger;
 		this.sessionId = Interlocked.Increment(ref nextSessionId);
 		this.state = useTls ? SmtpState.TlsStarted : SmtpState.Initial;
