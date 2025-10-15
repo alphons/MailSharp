@@ -1,7 +1,6 @@
-using MailSharp.Smtp.Services;
+using MailSharp.Smtp.Extensions;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Mvc.Razor;
-
 
 var builder = WebApplication.CreateBuilder(new WebApplicationOptions
 {
@@ -23,8 +22,6 @@ builder.Services.Configure<RazorViewEngineOptions>(options =>
 	options.PageViewLocationFormats.Add("/wwwroot/MasterPages/{0}.cshtml");
 });
 
-
-
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
 	.AddCookie(options =>
 	{
@@ -36,15 +33,11 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
 	});
 
 builder.Services.AddAuthorization();
-builder.Services.AddControllersWithViews();
 
 builder.Host.UseWindowsService();
 builder.Services.AddLogging(logging => logging.AddConsole());
-builder.Services.AddHostedService<SmtpServerService>();
-builder.Services.AddSingleton<SmtpServerStatus>();
-builder.Services.AddSingleton<DkimSigner>();
-builder.Services.AddSingleton<SpfChecker>();
-builder.Services.AddSingleton<DkimVerifier>();
+
+builder.Services.AddSmtpServerServices();
 
 var app = builder.Build();
 
