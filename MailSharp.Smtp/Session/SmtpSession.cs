@@ -118,11 +118,15 @@ public partial class SmtpSession
 							return;
 						}
 
+						//logger.LogDebug(line);
+
 						string[] parts = line.Split(' ');
 						string command = parts[0].ToUpper();
 						eventIdConfig = configuration.GetSection("SmtpEventIds:CommandReceived").Get<EventIdConfig>()
 							?? throw new InvalidOperationException("Missing SmtpEventIds:CommandReceived");
-						logger.LogInformation(new EventId(eventIdConfig.Id, eventIdConfig.Name), configuration["SmtpLogMessages:CommandReceived"], command, sessionId);
+
+						if (state != SmtpState.DataStarted)
+							logger.LogInformation(new EventId(eventIdConfig.Id, eventIdConfig.Name), configuration["SmtpLogMessages:CommandReceived"], command, sessionId);
 
 						if (commandHandlers.TryGetValue(command, out var handler))
 						{

@@ -23,7 +23,7 @@ public partial class SmtpSession
 		string ptrRecord = "Unknown";
 		try
 		{
-			var ptrResult = await System.Net.Dns.GetHostEntryAsync(remoteEndPoint!.Address);
+			var ptrResult = await Dns.GetHostEntryAsync(remoteEndPoint!.Address);
 			ptrRecord = ptrResult.HostName;
 		}
 		catch
@@ -41,17 +41,19 @@ public partial class SmtpSession
 		emlContent.Append(data);
 
 		// Verify DKIM signature
-		bool dkimValid = await dkimVerifier.VerifyDkimAsync(emlContent.ToString(), clientIp);
-		if (!dkimValid && configuration.GetValue<bool>("SmtpSettings:RequireDkim"))
-		{
-			await writer.WriteLineAsync("550 DKIM verification failed", ct);
-			return;
-		}
+		//bool dkimValid = await dkimVerifier.VerifyDkimAsync(emlContent.ToString(), clientIp);
+		//if (!dkimValid && configuration.GetValue<bool>("SmtpSettings:RequireDkim"))
+		//{
+		//	await writer.WriteLineAsync("550 DKIM verification failed", ct);
+		//	return;
+		//}
 
 		// Sign with DKIM
-		string domain = mailFrom!.Substring(mailFrom.IndexOf('@') + 1);
-		string selector = configuration[$"SmtpSettings:Dkim:{domain}:Selector"] ?? "default";
-		string signedEml = dkimSigner.SignEmail(emlContent.ToString(), selector, domain);
+		//string domain = mailFrom!.Substring(mailFrom.IndexOf('@') + 1);
+		//string selector = configuration[$"SmtpSettings:Dkim:{domain}:Selector"] ?? "default";
+		//string signedEml = dkimSigner.SignEmail(emlContent.ToString(), selector, domain);
+
+		string signedEml = emlContent.ToString();
 
 		// Save .eml file
 		string storagePath = configuration["SmtpSettings:EmlStoragePath"] ?? throw new InvalidOperationException("EmlStoragePath not configured");

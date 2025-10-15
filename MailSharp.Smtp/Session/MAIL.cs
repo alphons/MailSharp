@@ -28,12 +28,16 @@ public partial class SmtpSession
 		string mailFromAddress = line.Substring(line.IndexOf("FROM:", StringComparison.OrdinalIgnoreCase) + 5).Trim();
 		string mailFromDomain = mailFromAddress.Substring(mailFromAddress.IndexOf('@') + 1);
 		string clientIp = (client.Client.RemoteEndPoint as IPEndPoint)?.Address.ToString() ?? "Unknown";
-		bool spfValid = await spfChecker.CheckSpfAsync(clientIp, mailFromDomain, mailFromDomain);
 
-		if (!spfValid)
+		if (configuration.GetValue<bool>("SmtpSettings:RequireDkim"))
 		{
-			await writer.WriteLineAsync("550 SPF check failed", ct);
-			return;
+			bool spfValid = await spfChecker.CheckSpfAsync(clientIp, mailFromDomain, mailFromDomain);
+
+			if (!spfValid)
+			{
+				await writer.WriteLineAsync("550 SPF check failed", ct);
+				return;
+			}
 		}
 
 		mailFrom = mailFromAddress;
