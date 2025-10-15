@@ -62,7 +62,9 @@ public partial class SmtpSession
 		await File.WriteAllTextAsync(fileName, signedEml, ct);
 
 		await writer.WriteLineAsync(configuration["SmtpResponses:MessageAccepted"], ct);
-		Console.WriteLine($"Saved message from {mailFrom} to {string.Join(", ", rcptTo)} as {fileName}");
+
+		logger.LogInformation("Received email from {MailFrom} to {RcptTo} saved as {FileName}", mailFrom, string.Join(", ", rcptTo), fileName);
+
 		mailFrom = null;
 		rcptTo.Clear();
 		data.Clear();
