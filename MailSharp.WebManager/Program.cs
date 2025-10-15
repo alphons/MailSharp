@@ -2,10 +2,14 @@ using MailSharp.Smtp.Services;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Mvc.Razor;
 
+
 var builder = WebApplication.CreateBuilder(new WebApplicationOptions
 {
 	ContentRootPath = AppContext.BaseDirectory
 });
+
+builder.Services.AddMvcCore().WithMultiParameterModelBinding();
+
 builder.Services.AddRazorPages(o => o.RootDirectory = "/wwwroot");
 
 builder.Services.Configure<RazorViewEngineOptions>(options =>
@@ -43,6 +47,9 @@ builder.Services.AddSingleton<SpfChecker>();
 builder.Services.AddSingleton<DkimVerifier>();
 
 var app = builder.Build();
+
+app.UseDefaultFiles();
+app.UseStaticFiles();
 
 app.UseAuthentication();
 app.UseAuthorization();

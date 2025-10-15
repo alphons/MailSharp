@@ -7,11 +7,11 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Content Remove="wwwroot\Index.cshtml.cs" />
+    <Content Remove="wwwroot\Account\Login.cshtml.cs" />
   </ItemGroup>
 
   <ItemGroup>
-    <Compile Include="wwwroot\Index.cshtml.cs" />
+    <Compile Include="wwwroot\Account\Login.cshtml.cs" />
   </ItemGroup>
 
   <ItemGroup>
@@ -21,6 +21,7 @@
 	<ItemGroup>
 		<PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" Version="9.0.9" />
 		<PackageReference Include="Microsoft.Extensions.Identity.Core" Version="9.0.9" />
+		<PackageReference Include="Mvc.ModelBinding.MultiParameter" Version="8.2.3" />
 	</ItemGroup>
 
 	<ItemGroup>
