@@ -13,6 +13,7 @@ public enum SmtpState
 	HeloReceived,
 	MailFromReceived,
 	RcptToReceived,
+	HeaderStarted,
 	DataStarted,
 	TlsStarted
 }
@@ -78,7 +79,6 @@ public partial class SmtpSession
 		commandHandlers.Add("MAIL", HandleMailAsync);
 		commandHandlers.Add("RCPT", HandleRcptAsync);
 		commandHandlers.Add("DATA", HandleDataAsync);
-		commandHandlers.Add(".", HandleDataEndAsync);
 		commandHandlers.Add("QUIT", HandleQuitAsync);
 		commandHandlers.Add("NOOP", HandleNoopAsync);
 		commandHandlers.Add("RSET", HandleRsetAsync);
@@ -118,15 +118,42 @@ public partial class SmtpSession
 							return;
 						}
 
-						//logger.LogDebug(line);
+						if (state == SmtpState.HeaderStarted)
+						{
+							data.AppendLine(line);
+
+							if (line == string.Empty)
+							{
+								eventIdConfig = configuration.GetSection("SmtpEventIds:HeaderEnd").Get<EventIdConfig>()
+									?? throw new InvalidOperationException("Missing SmtpEventIds:HeaderEnd");
+								logger.LogInformation(new EventId(eventIdConfig.Id, eventIdConfig.Name), configuration["SmtpLogMessages:HeaderEnd"], sessionId);
+
+								await HandleHeaderEndAsync([], line, linkedCts.Token);
+							}
+							continue;
+						}
+
+						if (state == SmtpState.DataStarted)
+						{
+							if (line == ".")
+							{
+								eventIdConfig = configuration.GetSection("SmtpEventIds:DataEnd").Get<EventIdConfig>()
+									?? throw new InvalidOperationException("Missing SmtpEventIds:DataEnd");
+								logger.LogInformation(new EventId(eventIdConfig.Id, eventIdConfig.Name), configuration["SmtpLogMessages:DataEnd"], sessionId);
+
+								await HandleDataEndAsync([], line, linkedCts.Token);
+							}
+							else
+								data.AppendLine(line);
+							continue;
+						}
 
 						string[] parts = line.Split(' ');
 						string command = parts[0].ToUpper();
 						eventIdConfig = configuration.GetSection("SmtpEventIds:CommandReceived").Get<EventIdConfig>()
 							?? throw new InvalidOperationException("Missing SmtpEventIds:CommandReceived");
 
-						if (state != SmtpState.DataStarted)
-							logger.LogInformation(new EventId(eventIdConfig.Id, eventIdConfig.Name), configuration["SmtpLogMessages:CommandReceived"], command, sessionId);
+						logger.LogInformation(new EventId(eventIdConfig.Id, eventIdConfig.Name), configuration["SmtpLogMessages:CommandReceived"], command, sessionId);
 
 						if (commandHandlers.TryGetValue(command, out var handler))
 						{
@@ -138,10 +165,6 @@ public partial class SmtpSession
 								logger.LogInformation(new EventId(eventIdConfig.Id, eventIdConfig.Name), configuration["SmtpLogMessages:SessionEndedByQuit"], sessionId);
 								return;
 							}
-						}
-						else if (state == SmtpState.DataStarted)
-						{
-							data.AppendLine(line);
 						}
 						else
 						{

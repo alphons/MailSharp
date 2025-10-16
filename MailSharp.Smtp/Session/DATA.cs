@@ -19,8 +19,8 @@ public partial class SmtpSession
 			return;
 		}
 
-		state = SmtpState.DataStarted;
-		await writer.WriteLineAsync(configuration["SmtpResponses:DataStart"], ct);
+		state = SmtpState.HeaderStarted;
+		await writer.WriteLineAsync(configuration["SmtpResponses:HeaderStart"], ct);
 	}
 
 }

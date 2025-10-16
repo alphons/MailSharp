@@ -1,6 +1,5 @@
 using MailSharp.Smtp.Extensions;
-using Microsoft.AspNetCore.Authentication.Cookies;
-using Microsoft.AspNetCore.Mvc.Razor;
+using MailSharp.WebManager.Extensions;
 
 var builder = WebApplication.CreateBuilder(new WebApplicationOptions
 {
@@ -9,30 +8,9 @@ var builder = WebApplication.CreateBuilder(new WebApplicationOptions
 
 builder.Services.AddMvcCore().WithMultiParameterModelBinding();
 
-builder.Services.AddRazorPages(o => o.RootDirectory = "/wwwroot");
+builder.Services.AddRazorUnderRoot();
 
-builder.Services.Configure<RazorViewEngineOptions>(options =>
-{
-	options.ViewLocationFormats.Clear();
-	options.ViewLocationFormats.Add("/wwwroot/{0}.cshtml");
-	options.ViewLocationFormats.Add("/wwwroot/MasterPages/{0}.cshtml");
-
-	options.PageViewLocationFormats.Clear();
-	options.PageViewLocationFormats.Add("/wwwroot/{0}.cshtml");
-	options.PageViewLocationFormats.Add("/wwwroot/MasterPages/{0}.cshtml");
-});
-
-builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
-	.AddCookie(options =>
-	{
-		options.LoginPath = "/Account/Login";
-		options.AccessDeniedPath = "/Account/AccessDenied";
-		options.Cookie.HttpOnly = true;
-		options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
-		options.Cookie.SameSite = SameSiteMode.Strict;
-	});
-
-builder.Services.AddAuthorization();
+builder.Services.AddAuthenticationAndAddAuthorization();
 
 builder.Host.UseWindowsService();
 builder.Services.AddLogging(logging => logging.AddConsole());
@@ -44,8 +22,7 @@ var app = builder.Build();
 app.UseDefaultFiles();
 app.UseStaticFiles();
 
-app.UseAuthentication();
-app.UseAuthorization();
+app.UseAuthenticationAndAddAuthorization();
 
 app.MapDefaultControllerRoute();
 
