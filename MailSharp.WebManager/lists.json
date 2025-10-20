@@ -1,0 +1,4 @@
+﻿{
+	"support": [ "user1@example.com", "user2@example.com" ],
+	"marketing": [ "user3@example.com", "user4@example.com" ]
+}

@@ -1,34 +1,21 @@
 ﻿using MailSharp.Common;
 using MailSharp.Common.Services;
 using System.Net.Sockets;
+using System.Security.Cryptography.X509Certificates;
+using System.Net.Security;
+using System.Text;
 
 namespace MailSharp.POP3.Session;
 
-public class Pop3Session
+public class Pop3Session(
+	TcpClient client,
+	IConfiguration configuration,
+	bool useTls,
+	AuthenticationService authService,
+	MailboxService mailboxService,
+	ILogger<Pop3Session> logger)
 {
-	private readonly TcpClient client;
-	private readonly IConfiguration configuration;
-	private readonly bool useTls;
-	private readonly AuthenticationService authService;
-	private readonly MailboxService mailboxService;
-	private readonly ILogger<Pop3Session> logger;
 	private Stream? stream;
-
-	public Pop3Session(
-		TcpClient client,
-		IConfiguration configuration,
-		bool useTls,
-		AuthenticationService authService,
-		MailboxService mailboxService,
-		ILogger<Pop3Session> logger)
-	{
-		this.client = client;
-		this.configuration = configuration;
-		this.useTls = useTls;
-		this.authService = authService;
-		this.mailboxService = mailboxService;
-		this.logger = logger;
-	}
 
 	public async Task ProcessAsync(CancellationToken cancellationToken)
 	{
@@ -36,10 +23,8 @@ public class Pop3Session
 		{
 			stream = useTls ? await InitializeTlsStreamAsync() : client.GetStream();
 			await SendResponseAsync("+OK POP3 server ready", cancellationToken);
-
 			bool isAuthenticated = false;
 			string? username = null;
-
 			while (!cancellationToken.IsCancellationRequested)
 			{
 				string? command = await ReadCommandAsync(cancellationToken);
@@ -47,14 +32,12 @@ public class Pop3Session
 				{
 					break;
 				}
-
 				var parts = command.Split(' ', StringSplitOptions.RemoveEmptyEntries);
 				if (parts.Length == 0)
 				{
 					await SendResponseAsync("-ERR Invalid command", cancellationToken);
 					continue;
 				}
-
 				switch (parts[0].ToUpper())
 				{
 					case "USER":
@@ -66,7 +49,6 @@ public class Pop3Session
 						username = parts[1];
 						await SendResponseAsync("+OK Username accepted", cancellationToken);
 						break;
-
 					case "PASS":
 						if (parts.Length != 2 || username == null)
 						{
@@ -78,26 +60,56 @@ public class Pop3Session
 							isAuthenticated ? "+OK Authentication successful" : "-ERR Authentication failed",
 							cancellationToken);
 						break;
-
 					case "LIST":
 						if (!isAuthenticated)
 						{
 							await SendResponseAsync("-ERR Authentication required", cancellationToken);
 							continue;
 						}
-						var messages = await mailboxService.GetMessagesAsync(username!, cancellationToken);
-						await SendResponseAsync("+OK " + messages.Count + " messages", cancellationToken);
+						var messages = await mailboxService.GetMessagesAsync(username!, "INBOX", cancellationToken);
+						await SendResponseAsync($"+OK {messages.Count} messages", cancellationToken);
 						for (int i = 0; i < messages.Count; i++)
 						{
-							await SendResponseAsync($"{i + 1} {messages[i].Length}", cancellationToken);
+							string filePath = Path.Combine(
+								configuration["MailboxSettings:StoragePath"] ?? throw new InvalidOperationException("MailboxStoragePath not configured"),
+								username!,
+								"INBOX",
+								$"{messages[i].Uid}.eml");
+							long size = File.Exists(filePath) ? new FileInfo(filePath).Length : 0;
+							await SendResponseAsync($"{i + 1} {size}", cancellationToken);
 						}
 						await SendResponseAsync(".", cancellationToken);
 						break;
-
+					case "RETR":
+						if (!isAuthenticated)
+						{
+							await SendResponseAsync("-ERR Authentication required", cancellationToken);
+							continue;
+						}
+						if (parts.Length != 2 || !int.TryParse(parts[1], out int msgNum) || msgNum < 1)
+						{
+							await SendResponseAsync("-ERR RETR requires valid message number", cancellationToken);
+							continue;
+						}
+						var retrMessages = await mailboxService.GetMessagesAsync(username!, "INBOX", cancellationToken);
+						if (msgNum > retrMessages.Count)
+						{
+							await SendResponseAsync("-ERR No such message", cancellationToken);
+							continue;
+						}
+						string? content = await mailboxService.GetMessageContentAsync(username!, "INBOX", retrMessages[msgNum - 1].Uid, cancellationToken);
+						if (content == null)
+						{
+							await SendResponseAsync("-ERR Message not found", cancellationToken);
+							continue;
+						}
+						await SendResponseAsync($"+OK {content.Length} octets", cancellationToken);
+						await SendResponseAsync(content, cancellationToken);
+						await SendResponseAsync(".", cancellationToken);
+						break;
 					case "QUIT":
 						await SendResponseAsync("+OK POP3 server signing off", cancellationToken);
 						return;
-
 					default:
 						await SendResponseAsync("-ERR Unknown command", cancellationToken);
 						break;
@@ -121,10 +133,37 @@ public class Pop3Session
 		}
 	}
 
+	// Initialize TLS stream for POP3 session
 	private async Task<Stream> InitializeTlsStreamAsync()
 	{
-		// Placeholder: Implement TLS initialization
-		return client.GetStream(); // Replace with actual TLS stream setup
+		try
+		{
+			string certPath = configuration["Pop3Settings:CertificatePath"] ?? throw new InvalidOperationException("CertificatePath not configured");
+			string certPassword = configuration["Pop3Settings:CertificatePassword"] ?? string.Empty;
+			X509Certificate2 certificate = new(certPath, certPassword);
+			SslStream sslStream = new(client.GetStream(), false);
+			await sslStream.AuthenticateAsServerAsync(certificate, false, System.Security.Authentication.SslProtocols.Tls12 | System.Security.Authentication.SslProtocols.Tls13, false);
+
+			var eventIdConfig = configuration.GetSection("Pop3EventIds:TlsInitialized").Get<EventIdConfig>()
+				?? throw new InvalidOperationException("Missing Pop3EventIds:TlsInitialized");
+			logger.LogInformation(
+				new EventId(eventIdConfig.Id, eventIdConfig.Name),
+				configuration["Pop3LogMessages:TlsInitialized"],
+				client.Client.RemoteEndPoint);
+
+			return sslStream;
+		}
+		catch (Exception ex)
+		{
+			var eventIdConfig = configuration.GetSection("Pop3EventIds:TlsInitializationFailed").Get<EventIdConfig>()
+				?? throw new InvalidOperationException("Missing Pop3EventIds:TlsInitializationFailed");
+			logger.LogError(
+				new EventId(eventIdConfig.Id, eventIdConfig.Name),
+				ex,
+				configuration["Pop3LogMessages:TlsInitializationFailed"],
+				client.Client.RemoteEndPoint);
+			throw;
+		}
 	}
 
 	private async Task<string?> ReadCommandAsync(CancellationToken cancellationToken)
@@ -133,10 +172,9 @@ public class Pop3Session
 		{
 			return null;
 		}
-
 		byte[] buffer = new byte[1024];
 		int bytesRead = await stream.ReadAsync(buffer, cancellationToken);
-		return System.Text.Encoding.ASCII.GetString(buffer, 0, bytesRead).Trim();
+		return Encoding.ASCII.GetString(buffer, 0, bytesRead).Trim();
 	}
 
 	private async Task SendResponseAsync(string response, CancellationToken cancellationToken)
@@ -145,8 +183,7 @@ public class Pop3Session
 		{
 			return;
 		}
-
-		byte[] data = System.Text.Encoding.ASCII.GetBytes(response + "\r\n");
+		byte[] data = Encoding.ASCII.GetBytes(response + "\r\n");
 		await stream.WriteAsync(data, cancellationToken);
 		await stream.FlushAsync(cancellationToken);
 	}

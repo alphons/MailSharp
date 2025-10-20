@@ -13,7 +13,7 @@ public static class SmtpServiceExtensions
 		services.AddSingleton<DkimSigner>();
 		services.AddSingleton<SpfChecker>();
 		services.AddSingleton<DkimVerifier>();
-
+		services.AddSingleton<DmarcChecker>();
 		return services;
 	}
 }

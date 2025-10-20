@@ -14,6 +14,7 @@ public class SmtpServer
 	private readonly DkimSigner dkimSigner;
 	private readonly SpfChecker spfChecker;
 	private readonly DkimVerifier dkimVerifier;
+	private readonly DmarcChecker dmarcChecker;
 	private readonly List<(TcpListener Listener, bool StartTls, bool UseTls)> listeners = [];
 	private CancellationTokenSource? cts;
 
@@ -24,12 +25,14 @@ public class SmtpServer
 		public bool UseTls { get; set; }
 	}
 
-	public SmtpServer(IConfiguration configuration, 
-		ILogger<SmtpServer> logger, 
+	public SmtpServer(
+		IConfiguration configuration,
+		ILogger<SmtpServer> logger,
 		ILogger<SmtpSession> sessionLogger,
-		DkimSigner dkimSigner, 
-		SpfChecker spfChecker, 
-		DkimVerifier dkimVerifier)
+		DkimSigner dkimSigner,
+		SpfChecker spfChecker,
+		DkimVerifier dkimVerifier,
+		DmarcChecker dmarcChecker)
 	{
 		this.configuration = configuration;
 		this.logger = logger;
@@ -37,9 +40,10 @@ public class SmtpServer
 		this.dkimSigner = dkimSigner;
 		this.spfChecker = spfChecker;
 		this.dkimVerifier = dkimVerifier;
+		this.dmarcChecker = dmarcChecker;
 		string host = configuration["SmtpSettings:Host"] ?? throw new InvalidOperationException("Host not configured");
-		var ports = configuration.GetSection("SmtpSettings:Ports").Get<List<PortConfig>>() ?? throw new InvalidOperationException("Ports not configured");
-
+		var ports = configuration.GetSection("SmtpSettings:Ports").Get<List<PortConfig>>()
+			?? throw new InvalidOperationException("Ports not configured");
 		foreach (var port in ports)
 		{
 			listeners.Add((new TcpListener(IPAddress.Parse(host), port.Port), port.StartTls, port.UseTls));
@@ -49,7 +53,6 @@ public class SmtpServer
 	public async Task StartAsync()
 	{
 		cts = new CancellationTokenSource();
-
 		await Task.WhenAll(listeners.Select(l =>
 		{
 			try
@@ -57,13 +60,20 @@ public class SmtpServer
 				l.Listener.Start();
 				var eventIdConfig = configuration.GetSection("SmtpEventIds:ServerStarted").Get<EventIdConfig>()
 					?? throw new InvalidOperationException("Missing SmtpEventIds:ServerStarted");
-				logger.LogInformation(new EventId(eventIdConfig.Id, eventIdConfig.Name), configuration["SmtpLogMessages:ServerStarted"], l.Listener.LocalEndpoint, l.StartTls, l.UseTls);
+				logger.LogInformation(
+					new EventId(eventIdConfig.Id, eventIdConfig.Name),
+					configuration["SmtpLogMessages:ServerStarted"],
+					l.Listener.LocalEndpoint, l.StartTls, l.UseTls);
 			}
 			catch (SocketException ex)
 			{
 				var eventIdConfig = configuration.GetSection("SmtpEventIds:ServerStartFailed").Get<EventIdConfig>()
 					?? throw new InvalidOperationException("Missing SmtpEventIds:ServerStartFailed");
-				logger.LogError(new EventId(eventIdConfig.Id, eventIdConfig.Name), ex, configuration["SmtpLogMessages:ServerStartFailed"], ((IPEndPoint)l.Listener.LocalEndpoint).Port);
+				logger.LogError(
+					new EventId(eventIdConfig.Id, eventIdConfig.Name),
+					ex,
+					configuration["SmtpLogMessages:ServerStartFailed"],
+					((IPEndPoint)l.Listener.LocalEndpoint).Port);
 			}
 			return Task.Run(() => AcceptClientsAsync(l.Listener, l.StartTls, l.UseTls, cts.Token), cts.Token);
 		}));
@@ -79,22 +89,32 @@ public class SmtpServer
 				var client = await listener.AcceptTcpClientAsync(cancellationToken);
 				var eventIdConfig = configuration.GetSection("SmtpEventIds:ClientAccepted").Get<EventIdConfig>()
 					?? throw new InvalidOperationException("Missing SmtpEventIds:ClientAccepted");
-				logger.LogInformation(new EventId(eventIdConfig.Id, eventIdConfig.Name), configuration["SmtpLogMessages:ClientAccepted"], client.Client.RemoteEndPoint);
-				var session = new SmtpSession(client, configuration, startTls, useTls, dkimSigner, spfChecker, dkimVerifier, sessionLogger);
+				logger.LogInformation(
+					new EventId(eventIdConfig.Id, eventIdConfig.Name),
+					configuration["SmtpLogMessages:ClientAccepted"],
+					client.Client.RemoteEndPoint);
+				var session = new SmtpSession(client, configuration, startTls, useTls, dkimSigner, spfChecker, dkimVerifier, dmarcChecker, sessionLogger);
 				_ = session.ProcessAsync(cancellationToken);
 			}
 			catch (OperationCanceledException)
 			{
 				var eventIdConfig = configuration.GetSection("SmtpEventIds:ListenerStopped").Get<EventIdConfig>()
 					?? throw new InvalidOperationException("Missing SmtpEventIds:ListenerStopped");
-				logger.LogInformation(new EventId(eventIdConfig.Id, eventIdConfig.Name), configuration["SmtpLogMessages:ListenerStopped"], listener.LocalEndpoint);
+				logger.LogInformation(
+					new EventId(eventIdConfig.Id, eventIdConfig.Name),
+					configuration["SmtpLogMessages:ListenerStopped"],
+					listener.LocalEndpoint);
 				break;
 			}
 			catch (Exception ex)
 			{
 				var eventIdConfig = configuration.GetSection("SmtpEventIds:ClientAcceptError").Get<EventIdConfig>()
 					?? throw new InvalidOperationException("Missing SmtpEventIds:ClientAcceptError");
-				logger.LogError(new EventId(eventIdConfig.Id, eventIdConfig.Name), ex, configuration["SmtpLogMessages:ClientAcceptError"], listener.LocalEndpoint);
+				logger.LogError(
+					new EventId(eventIdConfig.Id, eventIdConfig.Name),
+					ex,
+					configuration["SmtpLogMessages:ClientAcceptError"],
+					listener.LocalEndpoint);
 			}
 		}
 	}
@@ -110,7 +130,10 @@ public class SmtpServer
 			tcplistener.Stop();
 			var eventIdConfig = configuration.GetSection("SmtpEventIds:ListenerStopped").Get<EventIdConfig>()
 				?? throw new InvalidOperationException("Missing SmtpEventIds:ListenerStopped");
-			logger.LogInformation(new EventId(eventIdConfig.Id, eventIdConfig.Name), configuration["SmtpLogMessages:ListenerStopped"], tcplistener.LocalEndpoint);
+			logger.LogInformation(
+				new EventId(eventIdConfig.Id, eventIdConfig.Name),
+				configuration["SmtpLogMessages:ListenerStopped"],
+				tcplistener.LocalEndpoint);
 			tcplistener.Dispose();
 		}
 		listeners.Clear();

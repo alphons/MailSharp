@@ -1,6 +1,8 @@
-﻿using MailSharp.SMTP.Extensions;
+﻿using MailSharp.Common;
+using MailSharp.SMTP.Extensions;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 
 namespace MailSharp.SMTP.Session;
 
@@ -48,7 +50,7 @@ public partial class SmtpSession
 			{
 				string decoded = Encoding.UTF8.GetString(Convert.FromBase64String(credentials));
 				string[] credentialParts = decoded.Split('\0');
-				if (credentialParts.Length != 3 || !ValidateCredentials(credentialParts[1], credentialParts[2]))
+				if (credentialParts.Length != 3 || !await ValidateCredentialsAsync(credentialParts[1], credentialParts[2]))
 				{
 					await writer.WriteLineAsync(configuration["SmtpResponses:AuthFailed"], ct);
 					return;
@@ -121,7 +123,7 @@ public partial class SmtpSession
 			{
 				string username = Encoding.UTF8.GetString(Convert.FromBase64String(usernameBase64));
 				string password = Encoding.UTF8.GetString(Convert.FromBase64String(passwordBase64));
-				if (!ValidateCredentials(username, password))
+				if (!await ValidateCredentialsAsync(username, password))
 				{
 					await writer.WriteLineAsync(configuration["SmtpResponses:AuthFailed"], ct);
 					return;
@@ -139,11 +141,29 @@ public partial class SmtpSession
 		}
 	}
 
-	// Validate PLAIN and LOGIN credentials (mock for testing)
-	private bool ValidateCredentials(string username, string password)
+	// Validate PLAIN and LOGIN credentials
+	private async Task<bool> ValidateCredentialsAsync(string username, string password)
 	{
-		string? storedPassword = configuration[$"SmtpSettings:Credentials:{username}"];
-		return storedPassword != null && storedPassword == password;
+		try
+		{
+			string userStorePath = configuration["SmtpSettings:UserStorePath"] ?? throw new InvalidOperationException("UserStorePath not configured");
+			if (!File.Exists(userStorePath))
+			{
+				logger.LogWarning("User store file {0} not found", userStorePath);
+				return false;
+			}
+
+			string json = await File.ReadAllTextAsync(userStorePath);
+			var users = JsonSerializer.Deserialize<List<UserConfig>>(json) ?? throw new InvalidOperationException("Invalid user store format");
+			var user = users.FirstOrDefault(u => u.Username == username && u.Password == password);
+
+			return user != null;
+		}
+		catch (Exception ex)
+		{
+			logger.LogError("Error validating credentials for user {0}: {1}", username, ex.Message);
+			return false;
+		}
 	}
 
 	// Validate CRAM-MD5 response

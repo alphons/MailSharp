@@ -44,9 +44,18 @@ public partial class SmtpSession
 		//bool dkimValid = await dkimVerifier.VerifyDkimAsync(emlContent.ToString(), clientIp);
 		//if (!dkimValid && configuration.GetValue<bool>("SmtpSettings:RequireDkim"))
 		//{
-		//	await writer.WriteLineAsync("550 DKIM verification failed", ct);
+		//	await writer.WriteLineAsync(configuration["SmtpResponses:DkimFailed"], ct);
 		//	return;
 		//}
+
+		// Verify DMARC
+		string mailFromDomain = mailFrom!.Substring(mailFrom.IndexOf('@') + 1);
+		bool dmarcValid = await dmarcChecker.CheckDmarcAsync(emlContent.ToString(), clientIp, mailFromDomain, mailFromDomain, ct);
+		if (!dmarcValid && configuration.GetValue<bool>("DmarcSettings:RequireDmarc"))
+		{
+			await writer.WriteLineAsync(configuration["SmtpResponses:DmarcFailed"], ct);
+			return;
+		}
 
 		// Sign with DKIM
 		//string domain = mailFrom!.Substring(mailFrom.IndexOf('@') + 1);

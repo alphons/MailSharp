@@ -10,9 +10,17 @@ public class SmtpService(IConfiguration configuration,
 	ILogger<SmtpSession> sessionLogger,
 	DkimSigner dkimSigner,
 	SpfChecker spfChecker, 
-	DkimVerifier dkimVerifier) : BackgroundService, IServerStatus
+	DkimVerifier dkimVerifier,
+	DmarcChecker dmarcChecker) : BackgroundService, IServerStatus
 {
-	private readonly SmtpServer server = new (configuration, serverLogger, sessionLogger, dkimSigner, spfChecker, dkimVerifier);
+	private readonly SmtpServer server = new (
+		configuration, 
+		serverLogger, 
+		sessionLogger, 
+		dkimSigner, 
+		spfChecker, 
+		dkimVerifier, 
+		dmarcChecker);
 
 	public bool IsRunning { get; set; }
 	protected override async Task ExecuteAsync(CancellationToken stoppingToken)

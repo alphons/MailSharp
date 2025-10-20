@@ -39,8 +39,17 @@ public partial class SmtpSession
 	private readonly DkimSigner dkimSigner;
 	private readonly SpfChecker spfChecker;
 	private readonly DkimVerifier dkimVerifier;
+	private readonly DmarcChecker dmarcChecker;
 
-	public SmtpSession(TcpClient client, IConfiguration configuration, bool startTls, bool useTls, DkimSigner dkimSigner, SpfChecker spfChecker, DkimVerifier dkimVerifier, ILogger<SmtpSession> logger)
+	public SmtpSession(
+		TcpClient client, 
+		IConfiguration configuration, 
+		bool startTls, bool useTls, 
+		DkimSigner dkimSigner, 
+		SpfChecker spfChecker,
+		DkimVerifier dkimVerifier, 
+		DmarcChecker dmarcChecker,
+		ILogger<SmtpSession> logger)
 	{
 		this.client = client;
 		this.configuration = configuration;
@@ -49,6 +58,7 @@ public partial class SmtpSession
 		this.dkimSigner = dkimSigner;
 		this.spfChecker = spfChecker;
 		this.dkimVerifier = dkimVerifier;
+		this.dmarcChecker = dmarcChecker;
 		this.logger = logger;
 		this.sessionId = Interlocked.Increment(ref nextSessionId);
 		this.state = useTls ? SmtpState.TlsStarted : SmtpState.Initial;
