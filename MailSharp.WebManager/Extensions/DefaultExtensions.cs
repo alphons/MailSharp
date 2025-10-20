@@ -1,6 +1,4 @@
-﻿using MailSharp.Smtp.Services;
-using MailSharp.WebManager.Controllers;
-using Microsoft.AspNetCore.Authentication.Cookies;
+﻿using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Mvc.Razor;
 
 namespace MailSharp.WebManager.Extensions;

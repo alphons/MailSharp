@@ -1,4 +1,4 @@
-﻿using MailSharp.Smtp.Services;
+﻿using MailSharp.SMTP.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
