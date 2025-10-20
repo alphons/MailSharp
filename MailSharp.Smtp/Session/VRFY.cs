@@ -1,7 +1,7 @@
-﻿using MailSharp.Smtp.Extensions;
+﻿using MailSharp.SMTP.Extensions;
 using Microsoft.Extensions.Configuration;
 
-namespace MailSharp.Smtp.Session;
+namespace MailSharp.SMTP.Session;
 
 public partial class SmtpSession
 {

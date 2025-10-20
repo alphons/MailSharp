@@ -1,4 +1,4 @@
-﻿namespace MailSharp.Smtp.Extensions;
+﻿namespace MailSharp.SMTP.Extensions;
 
 public static class StreamWriterExtensions
 {

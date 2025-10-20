@@ -2,7 +2,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
-namespace MailSharp.WebManager.Controllers;
+namespace MailSharp.SMTP.Controllers;
 
 [Authorize(Roles = "Administrator")]
 [Route("api/[controller]")]

@@ -1,6 +1,6 @@
-﻿using MailSharp.Smtp.Server;
+﻿using MailSharp.SMTP.Server;
 
-namespace MailSharp.Smtp.Services;
+namespace MailSharp.SMTP.Services;
 
 public class SmtpServerStatus
 {

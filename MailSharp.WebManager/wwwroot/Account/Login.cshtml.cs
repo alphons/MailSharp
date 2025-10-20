@@ -61,7 +61,7 @@ public class LoginController(IConfiguration configuration) : Controller
 
 			await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, new ClaimsPrincipal(claimsIdentity), authProperties);
 
-			return RedirectToAction("Index", "Home");
+			return Redirect("/");
 		}
 		TempData["ErrorMessage"] = "Invalid login attempt";
 

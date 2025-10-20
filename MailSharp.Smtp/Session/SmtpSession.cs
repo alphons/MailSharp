@@ -1,11 +1,11 @@
-﻿using MailSharp.Smtp.Extensions;
+﻿using MailSharp.SMTP.Extensions;
 using MailSharp.Smtp.Services;
 using System.Net.Security;
 using System.Net.Sockets;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
 
-namespace MailSharp.Smtp.Session;
+namespace MailSharp.SMTP.Session;
 
 public enum SmtpState
 {

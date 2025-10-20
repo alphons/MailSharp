@@ -1,6 +1,6 @@
 ﻿using System.Net;
 
-namespace MailSharp.Smtp.Services;
+namespace MailSharp.SMTP.Services;
 
 public class SpfChecker(IConfiguration configuration)
 {

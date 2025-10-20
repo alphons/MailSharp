@@ -1,4 +1,4 @@
-using MailSharp.Smtp.Extensions;
+using MailSharp.SMTP.Extensions;
 using MailSharp.WebManager.Extensions;
 
 var builder = WebApplication.CreateBuilder(new WebApplicationOptions

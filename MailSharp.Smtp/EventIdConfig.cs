@@ -1,5 +1,5 @@
 ﻿
-namespace MailSharp.Smtp;
+namespace MailSharp.SMTP;
 
 public class EventIdConfig
 {

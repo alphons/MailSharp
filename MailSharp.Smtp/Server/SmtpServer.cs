@@ -1,9 +1,9 @@
-﻿using MailSharp.Smtp.Services;
-using MailSharp.Smtp.Session;
+﻿using MailSharp.SMTP.Services;
+using MailSharp.SMTP.Session;
 using System.Net;
 using System.Net.Sockets;
 
-namespace MailSharp.Smtp.Server;
+namespace MailSharp.SMTP.Server;
 
 public class SmtpServer
 {

@@ -1,7 +1,7 @@
 ﻿using MailSharp.Smtp.Services;
-using MailSharp.WebManager.Controllers;
+using MailSharp.SMTP.Controllers;
 
-namespace MailSharp.Smtp.Extensions;
+namespace MailSharp.SMTP.Extensions;
 
 public static class SmtpServerServiceExtensions
 {

@@ -1,8 +1,8 @@
-﻿using MailSharp.Smtp.Extensions;
+﻿using MailSharp.SMTP.Extensions;
 using System.Security.Cryptography;
 using System.Text;
 
-namespace MailSharp.Smtp.Session;
+namespace MailSharp.SMTP.Session;
 
 public partial class SmtpSession
 {

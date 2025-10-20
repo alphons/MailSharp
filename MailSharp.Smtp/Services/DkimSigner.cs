@@ -1,7 +1,7 @@
 ﻿using System.Security.Cryptography;
 using System.Text;
 
-namespace MailSharp.Smtp.Services;
+namespace MailSharp.SMTP.Services;
 
 public class DkimSigner(IConfiguration configuration)
 {
