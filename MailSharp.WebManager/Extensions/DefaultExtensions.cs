@@ -1,10 +1,10 @@
-﻿using Microsoft.AspNetCore.Authentication.Cookies;
-using Microsoft.AspNetCore.Mvc.Razor;
-using MailSharp.Common.Extensions;
-
+﻿using MailSharp.Common.Extensions;
 using MailSharp.IMAP.Extensions;
 using MailSharp.POP3.Extensions;
 using MailSharp.SMTP.Extensions;
+using MailSharp.WebManager.Services;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Mvc.Razor;
 
 namespace MailSharp.WebManager.Extensions;
 
@@ -56,6 +56,8 @@ public static class DefaultExtensions
 		services.AddPop3Services();
 
 		services.AddImapServices();
+
+		services.AddSingleton<ServerStatusService>();
 
 		return services;
 	}

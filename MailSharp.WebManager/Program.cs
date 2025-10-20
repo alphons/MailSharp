@@ -9,6 +9,8 @@ builder.Services.AddMvcCore().WithMultiParameterModelBinding();
 
 builder.Services.AddRazorUnderRoot();
 
+builder.Services.AddControllersWithViews();
+
 builder.Services.AddAuthenticationAndAddAuthorization();
 
 builder.Host.UseWindowsService();
