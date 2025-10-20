@@ -1,28 +1,25 @@
-﻿using MailSharp.SMTP.Server;
+﻿using MailSharp.DataModel;
+using MailSharp.SMTP.Server;
+using MailSharp.SMTP.Session;
 
 namespace MailSharp.SMTP.Services;
 
-public class SmtpServerStatus
-{
-	public bool IsRunning { get; set; }
-}
-
-public class SmtpServerService(IConfiguration configuration, 
-	ILogger<SmtpServerService> logger, 
-	ILogger<Server.SmtpServer> serverLogger, 
-	ILogger<Session.SmtpSession> sessionLogger,
+public class SmtpService(IConfiguration configuration, 
+	ILogger<SmtpService> logger, 
+	ILogger<SmtpServer> serverLogger, 
+	ILogger<SmtpSession> sessionLogger,
 	DkimSigner dkimSigner,
 	SpfChecker spfChecker, 
-	DkimVerifier dkimVerifier,
-	SmtpServerStatus status) : BackgroundService
+	DkimVerifier dkimVerifier) : BackgroundService, IServerStatus
 {
 	private readonly SmtpServer server = new (configuration, serverLogger, sessionLogger, dkimSigner, spfChecker, dkimVerifier);
 
+	public bool IsRunning { get; set; }
 	protected override async Task ExecuteAsync(CancellationToken stoppingToken)
 	{
 		try
 		{
-			status.IsRunning = true;
+			IsRunning = true;
 			var eventIdConfig = configuration.GetSection("SmtpEventIds:ServiceStarting").Get<EventIdConfig>()
 				?? throw new InvalidOperationException("Missing SmtpEventIds:ServiceStarting");
 			logger.LogInformation(new EventId(eventIdConfig.Id, eventIdConfig.Name), configuration["SmtpLogMessages:ServiceStarting"]);
@@ -34,7 +31,7 @@ public class SmtpServerService(IConfiguration configuration,
 			var eventIdConfig = configuration.GetSection("SmtpEventIds:ServiceError").Get<EventIdConfig>()
 				?? throw new InvalidOperationException("Missing SmtpEventIds:ServiceError");
 			logger.LogError(new EventId(eventIdConfig.Id, eventIdConfig.Name), ex, configuration["SmtpLogMessages:ServiceError"]);
-			status.IsRunning = false;
+			IsRunning = false;
 			throw;
 		}
 	}
@@ -44,7 +41,7 @@ public class SmtpServerService(IConfiguration configuration,
 		var eventIdConfig = configuration.GetSection("SmtpEventIds:ServiceStopping").Get<EventIdConfig>()
 			?? throw new InvalidOperationException("Missing SmtpEventIds:ServiceStopping");
 		logger.LogInformation(new EventId(eventIdConfig.Id, eventIdConfig.Name), configuration["SmtpLogMessages:ServiceStopping"]);
-		status.IsRunning = false;
+		IsRunning = false;
 		await server.StopAsync();
 		await base.StopAsync(cancellationToken);
 	}

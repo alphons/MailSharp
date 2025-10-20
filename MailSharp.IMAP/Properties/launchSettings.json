@@ -1,0 +1,12 @@
+{
+  "profiles": {
+    "MailSharp.IMAP": {
+      "commandName": "Project",
+      "launchBrowser": true,
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      },
+      "applicationUrl": "https://localhost:10440;http://localhost:10441"
+    }
+  }
+}
