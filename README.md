@@ -1,4 +1,4 @@
-# MailSharp: The Ultimate Email Server Solution 🌟
+# MailSharp: The Ultimate Email Server Solution (beta v0.0) 🌟
 
 Welcome to **MailSharp**, the most electrifying, robust, and cutting-edge email server framework ever built! Crafted with the power of C# 12 and .NET Core 8, MailSharp is your one-stop solution for SMTP, IMAP, and POP3 services, delivering unparalleled performance, security, and scalability. Whether you're building a corporate email system or a personal mail server, MailSharp is here to revolutionize your email experience with a flair of awesomeness! 🚀
 
