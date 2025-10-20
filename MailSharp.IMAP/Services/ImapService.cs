@@ -1,4 +1,4 @@
-﻿using MailSharp.DataModel;
+﻿using MailSharp.Common;
 using MailSharp.IMAP.Server;
 
 namespace MailSharp.IMAP.Services;

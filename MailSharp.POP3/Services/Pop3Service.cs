@@ -1,4 +1,4 @@
-﻿using MailSharp.DataModel;
+﻿using MailSharp.Common;
 
 namespace MailSharp.POP3.Services;
 

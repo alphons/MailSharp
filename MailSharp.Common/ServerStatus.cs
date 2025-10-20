@@ -1,4 +1,4 @@
-﻿namespace MailSharp.DataModel;
+﻿namespace MailSharp.Common;
 
 public interface IServerStatus
 {

@@ -1,4 +1,4 @@
-﻿using MailSharp.DataModel;
+﻿using MailSharp.Common;
 using MailSharp.SMTP.Server;
 using MailSharp.SMTP.Session;
 

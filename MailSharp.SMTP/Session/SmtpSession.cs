@@ -1,4 +1,5 @@
-﻿using MailSharp.SMTP.Extensions;
+﻿using MailSharp.Common;
+using MailSharp.SMTP.Extensions;
 using MailSharp.SMTP.Services;
 using System.Net.Security;
 using System.Net.Sockets;

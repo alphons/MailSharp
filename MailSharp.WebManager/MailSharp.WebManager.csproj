@@ -17,7 +17,7 @@
   <ItemGroup>
     <ProjectReference Include="..\MailSharp.IMAP\MailSharp.IMAP.csproj" />
     <ProjectReference Include="..\MailSharp.POP3\MailSharp.POP3.csproj" />
-    <ProjectReference Include="..\MailSharp.Smtp\MailSharp.Smtp.csproj" />
+    <ProjectReference Include="..\MailSharp.SMTP\MailSharp.SMTP.csproj" />
   </ItemGroup>
 
 	<ItemGroup>
