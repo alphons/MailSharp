@@ -1,5 +1,10 @@
 ﻿using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Mvc.Razor;
+using MailSharp.Common.Extensions;
+
+using MailSharp.IMAP.Extensions;
+using MailSharp.POP3.Extensions;
+using MailSharp.SMTP.Extensions;
 
 namespace MailSharp.WebManager.Extensions;
 
@@ -41,6 +46,19 @@ public static class DefaultExtensions
 		return services;
 	}
 
+
+	public static IServiceCollection AddMailSharpServices(this IServiceCollection services)
+	{
+		services.AddCommonServices();
+
+		services.AddSmtpServices();
+
+		services.AddPop3Services();
+
+		services.AddImapServices();
+
+		return services;
+	}
 
 	public static IApplicationBuilder UseAuthenticationAndAddAuthorization(this IApplicationBuilder app)
 	{

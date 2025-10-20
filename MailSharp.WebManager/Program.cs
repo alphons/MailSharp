@@ -1,6 +1,3 @@
-using MailSharp.IMAP.Extensions;
-using MailSharp.POP3.Extensions;
-using MailSharp.SMTP.Extensions;
 using MailSharp.WebManager.Extensions;
 
 var builder = WebApplication.CreateBuilder(new WebApplicationOptions
@@ -18,11 +15,7 @@ builder.Host.UseWindowsService();
 
 builder.Services.AddLogging(logging => logging.AddConsole());
 
-builder.Services.AddSmtpServices();
-
-builder.Services.AddPop3Services();
-
-builder.Services.AddImapServices();
+builder.Services.AddMailSharpServices();
 
 var app = builder.Build();
 
