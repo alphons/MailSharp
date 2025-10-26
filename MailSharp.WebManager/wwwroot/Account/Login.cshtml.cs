@@ -38,7 +38,7 @@ public class LoginController(IConfiguration configuration) : Controller
 		var password = Request.Form["password"];
 
 		// Load users from appsettings.json
-		var users = configuration.GetSection("Users").Get<List<UserConfig>>();
+		var users = configuration.GetSection("MaintenanceUsers").Get<List<UserConfig>>();
 		var user = users?.FirstOrDefault(u => u.UserName == username && u.Password == password);
 
 		TempData["ErrorMessage"] = "";

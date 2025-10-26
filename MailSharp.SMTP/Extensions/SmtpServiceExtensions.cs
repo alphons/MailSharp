@@ -14,6 +14,7 @@ public static class SmtpServiceExtensions
 		services.AddSingleton<SpfChecker>();
 		services.AddSingleton<DkimVerifier>();
 		services.AddSingleton<DmarcChecker>();
+		services.AddHostedService<RelayService>();
 		return services;
 	}
 }
