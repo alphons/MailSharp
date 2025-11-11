@@ -10,7 +10,7 @@ namespace MailSharp.POP3.Session;
 public class Pop3Session(
 	TcpClient client,
 	IConfiguration configuration,
-	bool useTls,
+	SecurityEnum security,
 	AuthenticationService authService,
 	MailboxService mailboxService,
 	ILogger<Pop3Session> logger)
@@ -21,7 +21,7 @@ public class Pop3Session(
 	{
 		try
 		{
-			stream = useTls ? await InitializeTlsStreamAsync() : client.GetStream();
+			stream = security == SecurityEnum.Tls ? await InitializeTlsStreamAsync() : client.GetStream();
 			await SendResponseAsync("+OK POP3 server ready", cancellationToken);
 			bool isAuthenticated = false;
 			string? username = null;

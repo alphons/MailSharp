@@ -10,8 +10,7 @@ namespace MailSharp.IMAP.Session;
 public class ImapSession(
 	TcpClient client,
 	IConfiguration configuration,
-	bool startTls,
-	bool useTls,
+	SecurityEnum security,
 	AuthenticationService authService,
 	MailboxService mailboxService,
 	ILogger<ImapSession> logger)
@@ -23,7 +22,7 @@ public class ImapSession(
 	{
 		try
 		{
-			stream = useTls ? await InitializeTlsStreamAsync() : client.GetStream();
+			stream = security == SecurityEnum.Tls ? await InitializeTlsStreamAsync() : client.GetStream();
 			await SendResponseAsync("* OK IMAP4rev1 server ready", cancellationToken);
 			bool isAuthenticated = false;
 			string? username = null;
@@ -207,7 +206,7 @@ public class ImapSession(
 						await SendResponseAsync($"{tag} OK LOGOUT completed", cancellationToken);
 						return;
 					case "STARTTLS":
-						if (!startTls)
+						if (security !=  SecurityEnum.StartTls)
 						{
 							await SendResponseAsync($"{tag} NO STARTTLS not supported", cancellationToken);
 							continue;

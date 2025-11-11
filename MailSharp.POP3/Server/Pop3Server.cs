@@ -1,6 +1,5 @@
 ﻿using MailSharp.Common;
 using MailSharp.Common.Services;
-using MailSharp.POP3.Services;
 using MailSharp.POP3.Session;
 using System.Net;
 using System.Net.Sockets;
@@ -14,14 +13,8 @@ public class Pop3Server
 	private readonly ILogger<Pop3Session> sessionLogger;
 	private readonly AuthenticationService authService;
 	private readonly MailboxService mailboxService;
-	private readonly List<(TcpListener Listener, bool UseTls)> listeners = [];
+	private readonly List<(TcpListener Listener, SecurityEnum security)> listeners = [];
 	private CancellationTokenSource? cts;
-
-	private class PortConfig
-	{
-		public int Port { get; set; }
-		public bool UseTls { get; set; }
-	}
 
 	public Pop3Server(
 		IConfiguration configuration,
@@ -36,13 +29,12 @@ public class Pop3Server
 		this.authService = authService;
 		this.mailboxService = mailboxService;
 
-		string host = configuration["Pop3Settings:Host"] ?? throw new InvalidOperationException("Host not configured");
 		var ports = configuration.GetSection("Pop3Settings:Ports").Get<List<PortConfig>>()
 			?? throw new InvalidOperationException("Ports not configured");
 
 		foreach (var port in ports)
 		{
-			listeners.Add((new TcpListener(IPAddress.Parse(host), port.Port), port.UseTls));
+			listeners.Add((new TcpListener(IPAddress.Parse(port.Host), port.Port), port.Security));
 		}
 	}
 
@@ -59,7 +51,7 @@ public class Pop3Server
 				logger.LogInformation(
 					new EventId(eventIdConfig.Id, eventIdConfig.Name),
 					configuration["Pop3LogMessages:ServerStarted"],
-					l.Listener.LocalEndpoint, l.UseTls);
+					l.Listener.LocalEndpoint, l.security);
 			}
 			catch (SocketException ex)
 			{
@@ -71,12 +63,12 @@ public class Pop3Server
 					configuration["Pop3LogMessages:ServerStartFailed"],
 					((IPEndPoint)l.Listener.LocalEndpoint).Port);
 			}
-			return Task.Run(() => AcceptClientsAsync(l.Listener, l.UseTls, cts.Token), cts.Token);
+			return Task.Run(() => AcceptClientsAsync(l.Listener, l.security, cts.Token), cts.Token);
 		}));
 		await StopAsync();
 	}
 
-	private async Task AcceptClientsAsync(TcpListener listener, bool useTls, CancellationToken cancellationToken)
+	private async Task AcceptClientsAsync(TcpListener listener, SecurityEnum security, CancellationToken cancellationToken)
 	{
 		while (!cancellationToken.IsCancellationRequested)
 		{
@@ -90,7 +82,7 @@ public class Pop3Server
 					configuration["Pop3LogMessages:ClientAccepted"],
 					client.Client.RemoteEndPoint);
 
-				var session = new Pop3Session(client, configuration, useTls, authService, mailboxService, sessionLogger);
+				var session = new Pop3Session(client, configuration, security, authService, mailboxService, sessionLogger);
 				_ = session.ProcessAsync(cancellationToken);
 			}
 			catch (OperationCanceledException)

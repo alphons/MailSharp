@@ -1,5 +1,4 @@
-﻿using MailSharp.Common;
-using MailSharp.IMAP.Services;
+﻿using MailSharp.IMAP.Services;
 
 namespace MailSharp.IMAP.Extensions;
 

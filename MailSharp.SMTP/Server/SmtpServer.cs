@@ -15,15 +15,8 @@ public class SmtpServer
 	private readonly SpfChecker spfChecker;
 	private readonly DkimVerifier dkimVerifier;
 	private readonly DmarcChecker dmarcChecker;
-	private readonly List<(TcpListener Listener, bool StartTls, bool UseTls)> listeners = [];
+	private readonly List<(TcpListener Listener, SecurityEnum security)> listeners = [];
 	private CancellationTokenSource? cts;
-
-	private class PortConfig
-	{
-		public int Port { get; set; }
-		public bool StartTls { get; set; }
-		public bool UseTls { get; set; }
-	}
 
 	public SmtpServer(
 		IConfiguration configuration,
@@ -41,12 +34,11 @@ public class SmtpServer
 		this.spfChecker = spfChecker;
 		this.dkimVerifier = dkimVerifier;
 		this.dmarcChecker = dmarcChecker;
-		string host = configuration["SmtpSettings:Host"] ?? throw new InvalidOperationException("Host not configured");
 		var ports = configuration.GetSection("SmtpSettings:Ports").Get<List<PortConfig>>()
 			?? throw new InvalidOperationException("Ports not configured");
 		foreach (var port in ports)
 		{
-			listeners.Add((new TcpListener(IPAddress.Parse(host), port.Port), port.StartTls, port.UseTls));
+			listeners.Add((new TcpListener(IPAddress.Parse(port.Host), port.Port), port.Security));
 		}
 	}
 
@@ -63,7 +55,7 @@ public class SmtpServer
 				logger.LogInformation(
 					new EventId(eventIdConfig.Id, eventIdConfig.Name),
 					configuration["SmtpLogMessages:ServerStarted"],
-					l.Listener.LocalEndpoint, l.StartTls, l.UseTls);
+					l.Listener.LocalEndpoint, l.security);
 			}
 			catch (SocketException ex)
 			{
@@ -75,12 +67,12 @@ public class SmtpServer
 					configuration["SmtpLogMessages:ServerStartFailed"],
 					((IPEndPoint)l.Listener.LocalEndpoint).Port);
 			}
-			return Task.Run(() => AcceptClientsAsync(l.Listener, l.StartTls, l.UseTls, cts.Token), cts.Token);
+			return Task.Run(() => AcceptClientsAsync(l.Listener, l.security, cts.Token), cts.Token);
 		}));
 		await StopAsync();
 	}
 
-	private async Task AcceptClientsAsync(TcpListener listener, bool startTls, bool useTls, CancellationToken cancellationToken)
+	private async Task AcceptClientsAsync(TcpListener listener, SecurityEnum security, CancellationToken cancellationToken)
 	{
 		while (!cancellationToken.IsCancellationRequested)
 		{
@@ -93,7 +85,7 @@ public class SmtpServer
 					new EventId(eventIdConfig.Id, eventIdConfig.Name),
 					configuration["SmtpLogMessages:ClientAccepted"],
 					client.Client.RemoteEndPoint);
-				var session = new SmtpSession(client, configuration, startTls, useTls, dkimSigner, spfChecker, dkimVerifier, dmarcChecker, sessionLogger);
+				var session = new SmtpSession(client, configuration, security, dkimSigner, spfChecker, dkimVerifier, dmarcChecker, sessionLogger);
 				_ = session.ProcessAsync(cancellationToken);
 			}
 			catch (OperationCanceledException)
@@ -125,7 +117,7 @@ public class SmtpServer
 		{
 			await cts.CancelAsync();
 		}
-		foreach (var (tcplistener, _, _) in listeners)
+		foreach (var (tcplistener, _) in listeners)
 		{
 			tcplistener.Stop();
 			var eventIdConfig = configuration.GetSection("SmtpEventIds:ListenerStopped").Get<EventIdConfig>()

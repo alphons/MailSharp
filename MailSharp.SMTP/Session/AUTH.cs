@@ -1,5 +1,6 @@
 ﻿using MailSharp.Common;
 using MailSharp.SMTP.Extensions;
+using MailSharp.SMTP.Server;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -23,7 +24,7 @@ public partial class SmtpSession
 			return;
 		}
 
-		if (startTls && state != SmtpState.TlsStarted)
+		if (security == SecurityEnum.StartTls && state != SmtpState.TlsStarted)
 		{
 			await writer.WriteLineAsync(configuration["SmtpResponses:TlsRequired"], ct);
 			return;

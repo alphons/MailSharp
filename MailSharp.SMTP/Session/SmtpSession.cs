@@ -1,5 +1,6 @@
 ﻿using MailSharp.Common;
 using MailSharp.SMTP.Extensions;
+using MailSharp.SMTP.Server;
 using MailSharp.SMTP.Services;
 using System.Net.Security;
 using System.Net.Sockets;
@@ -23,8 +24,7 @@ public partial class SmtpSession
 {
 	private readonly TcpClient client;
 	private readonly IConfiguration configuration;
-	private readonly bool startTls;
-	private readonly bool useTls;
+	private readonly SecurityEnum security;
 	private readonly ILogger<SmtpSession> logger;
 	private readonly long sessionId;
 	private SmtpState state;
@@ -44,7 +44,7 @@ public partial class SmtpSession
 	public SmtpSession(
 		TcpClient client, 
 		IConfiguration configuration, 
-		bool startTls, bool useTls, 
+		SecurityEnum security, 
 		DkimSigner dkimSigner, 
 		SpfChecker spfChecker,
 		DkimVerifier dkimVerifier, 
@@ -53,17 +53,16 @@ public partial class SmtpSession
 	{
 		this.client = client;
 		this.configuration = configuration;
-		this.startTls = startTls;
-		this.useTls = useTls;
+		this.security = security;
 		this.dkimSigner = dkimSigner;
 		this.spfChecker = spfChecker;
 		this.dkimVerifier = dkimVerifier;
 		this.dmarcChecker = dmarcChecker;
 		this.logger = logger;
 		this.sessionId = Interlocked.Increment(ref nextSessionId);
-		this.state = useTls ? SmtpState.TlsStarted : SmtpState.Initial;
+		this.state = security == SecurityEnum.Tls ? SmtpState.TlsStarted : SmtpState.Initial;
 		this.stream = client.GetStream();
-		if (this.useTls)
+		if (security == SecurityEnum.Tls)
 		{
 			string certPath = configuration["SmtpSettings:CertificatePath"] ?? throw new InvalidOperationException("CertificatePath not configured");
 			string certPassword = configuration["SmtpSettings:CertificatePassword"] ?? string.Empty;
