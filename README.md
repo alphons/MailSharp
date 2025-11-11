@@ -37,12 +37,11 @@ Welcome to **MailSharp**, the most electrifying, robust, and cutting-edge email 
    Edit `appsettings.json` to set your host, ports, credentials, and DKIM keys. Example:
    ```json
    "SmtpSettings": {
-     "Host": "127.0.0.1",
-     "Ports": [
-       { "Port": 25, "StartTls": false, "UseTls": false },
-       { "Port": 587, "StartTls": true, "UseTls": false },
-       { "Port": 465, "StartTls": false, "UseTls": true }
-     ],
+	"Ports": [
+		{ "Host": "127.0.0.1", "Port": 25, "Security": "None" },
+		{ "Host": "127.0.0.1", "Port": 587, "Security": "StartTls" },
+		{ "Host": "127.0.0.1", "Port": 465, "Security": "Tls" }
+	],
      "CertificatePath": "certificate.pfx",
      "CertificatePassword": "yourpassword"
    }
