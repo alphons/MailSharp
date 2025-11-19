@@ -1,10 +1,11 @@
-﻿using System.Net;
+﻿using MailSharp.SMTP.Metrics;
+using System.Net;
 using System.Net.Mail;
 using System.Net.Sockets;
 
 namespace MailSharp.SMTP.Services;
 
-public class RelayService(IConfiguration configuration, ILogger<RelayService> logger) : BackgroundService
+public class RelayService(IConfiguration configuration, SmtpMetrics metrics, ILogger<RelayService> logger) : BackgroundService
 {
 	private readonly Queue<string> queue = new();
 
@@ -88,6 +89,8 @@ public class RelayService(IConfiguration configuration, ILogger<RelayService> lo
 						Body = emlContent,
 						To = { recipient }
 					}, ct);
+
+					metrics.IncrementRelayed();
 
 					await Task.Run(() => File.Delete(emlPath), ct);
 					logger.LogInformation("Relayed email to {Domain} via {MxServer}", domain, mxServer);

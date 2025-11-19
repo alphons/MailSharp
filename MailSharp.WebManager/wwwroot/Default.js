@@ -17,7 +17,7 @@ async function getstatus()
 	const result = await netproxyasync("/api/status/all");
 
 	document.getElementById("status").innerText =
-		' Smtp:' + result.IsSmtpRunning + '\n' +
-		' Imap:' + result.IsImapRunning + '\n' +
-		' Pop3:' + result.IsPop3Running + '\n';
+	' Smtp:' + result.Smtp + '\n' +
+	' Imap:' + result.Imap + '\n' +
+	' Pop3:' + result.Pop3 + '\n';
 }

@@ -4,6 +4,7 @@ using System.Net.Sockets;
 using System.Security.Cryptography.X509Certificates;
 using System.Net.Security;
 using System.Text;
+using MailSharp.IMAP.Metrics;
 
 namespace MailSharp.IMAP.Session;
 
@@ -13,6 +14,7 @@ public class ImapSession(
 	SecurityEnum security,
 	AuthenticationService authService,
 	MailboxService mailboxService,
+	ImapMetrics metrics,
 	ILogger<ImapSession> logger)
 {
 	private Stream? stream;

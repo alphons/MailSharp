@@ -14,6 +14,7 @@ public partial class SmtpSession
 			await writer.WriteLineAsync(configuration["SmtpResponses:BadSequence"], ct);
 			return;
 		}
+
 		state = SmtpState.HeloReceived;
 
 		// Gather connection info
@@ -73,6 +74,8 @@ public partial class SmtpSession
 		await writer.WriteLineAsync(configuration["SmtpResponses:MessageAccepted"], ct);
 
 		logger.LogInformation("Received email from {MailFrom} to {RcptTo} saved as {FileName}", mailFrom, string.Join(", ", rcptTo), fileName);
+
+		metrics.IncrementReceived();
 
 		mailFrom = null;
 		rcptTo.Clear();

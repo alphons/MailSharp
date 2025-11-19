@@ -1,4 +1,5 @@
 ﻿using MailSharp.Common;
+using MailSharp.SMTP.Metrics;
 using MailSharp.SMTP.Server;
 using MailSharp.SMTP.Session;
 
@@ -11,7 +12,8 @@ public class SmtpService(IConfiguration configuration,
 	DkimSigner dkimSigner,
 	SpfChecker spfChecker, 
 	DkimVerifier dkimVerifier,
-	DmarcChecker dmarcChecker) : BackgroundService, IServerStatus
+	DmarcChecker dmarcChecker,
+	SmtpMetrics metrics) : BackgroundService
 {
 	private readonly SmtpServer server = new (
 		configuration, 
@@ -20,14 +22,14 @@ public class SmtpService(IConfiguration configuration,
 		dkimSigner, 
 		spfChecker, 
 		dkimVerifier, 
-		dmarcChecker);
+		dmarcChecker,
+		metrics);
 
-	public bool IsRunning { get; set; }
 	protected override async Task ExecuteAsync(CancellationToken stoppingToken)
 	{
 		try
 		{
-			IsRunning = true;
+			metrics.IsRunning = true;
 			var eventIdConfig = configuration.GetSection("SmtpEventIds:ServiceStarting").Get<EventIdConfig>()
 				?? throw new InvalidOperationException("Missing SmtpEventIds:ServiceStarting");
 			logger.LogInformation(new EventId(eventIdConfig.Id, eventIdConfig.Name), configuration["SmtpLogMessages:ServiceStarting"]);
@@ -39,7 +41,7 @@ public class SmtpService(IConfiguration configuration,
 			var eventIdConfig = configuration.GetSection("SmtpEventIds:ServiceError").Get<EventIdConfig>()
 				?? throw new InvalidOperationException("Missing SmtpEventIds:ServiceError");
 			logger.LogError(new EventId(eventIdConfig.Id, eventIdConfig.Name), ex, configuration["SmtpLogMessages:ServiceError"]);
-			IsRunning = false;
+			metrics.IsRunning = false;
 			throw;
 		}
 	}
@@ -49,7 +51,7 @@ public class SmtpService(IConfiguration configuration,
 		var eventIdConfig = configuration.GetSection("SmtpEventIds:ServiceStopping").Get<EventIdConfig>()
 			?? throw new InvalidOperationException("Missing SmtpEventIds:ServiceStopping");
 		logger.LogInformation(new EventId(eventIdConfig.Id, eventIdConfig.Name), configuration["SmtpLogMessages:ServiceStopping"]);
-		IsRunning = false;
+		metrics.IsRunning = false;
 		await server.StopAsync();
 		await base.StopAsync(cancellationToken);
 	}

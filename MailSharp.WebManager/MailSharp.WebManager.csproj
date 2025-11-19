@@ -33,6 +33,7 @@
 
 	<ItemGroup>
 	  <Folder Include="Emails\" />
+	  <Folder Include="Services\" />
 	</ItemGroup>
 
 </Project>

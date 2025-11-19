@@ -1,17 +1,17 @@
 ﻿using MailSharp.Common;
 using MailSharp.Common.Services;
+using MailSharp.POP3.Metrics;
 using MailSharp.POP3.Server;
 using MailSharp.POP3.Session;
 
 namespace MailSharp.POP3.Services;
 
-public class Pop3Service : BackgroundService, IServerStatus
+public class Pop3Service : BackgroundService
 {
 	private readonly Pop3Server server;
 	private readonly IConfiguration configuration;
+	private readonly Pop3Metrics metrics;
 	private readonly ILogger<Pop3Service> logger;
-
-	public bool IsRunning { get; set; }
 
 	public Pop3Service(
 		IConfiguration configuration,
@@ -19,18 +19,20 @@ public class Pop3Service : BackgroundService, IServerStatus
 		ILogger<Pop3Server> serverLogger,
 		ILogger<Pop3Session> sessionLogger,
 		AuthenticationService authService,
-		MailboxService mailboxService)
+		MailboxService mailboxService,
+		Pop3Metrics metrics)
 	{
 		this.configuration = configuration;
+		this.metrics = metrics;
 		this.logger = logger;
-		this.server = new Pop3Server(configuration, serverLogger, sessionLogger, authService, mailboxService);
+		this.server = new Pop3Server(configuration, serverLogger, sessionLogger, authService, mailboxService, metrics);
 	}
 
 	protected override async Task ExecuteAsync(CancellationToken stoppingToken)
 	{
 		try
 		{
-			IsRunning = true;
+			metrics.IsRunning = true;
 			var eventIdConfig = configuration.GetSection("Pop3EventIds:ServiceStarting").Get<EventIdConfig>()
 				?? throw new InvalidOperationException("Missing Pop3EventIds:ServiceStarting");
 			logger.LogInformation(
@@ -48,7 +50,7 @@ public class Pop3Service : BackgroundService, IServerStatus
 				new EventId(eventIdConfig.Id, eventIdConfig.Name),
 				ex,
 				configuration["Pop3LogMessages:ServiceError"]);
-			IsRunning = false;
+			metrics.IsRunning = false;
 			throw;
 		}
 	}
@@ -60,7 +62,7 @@ public class Pop3Service : BackgroundService, IServerStatus
 		logger.LogInformation(
 			new EventId(eventIdConfig.Id, eventIdConfig.Name),
 			configuration["Pop3LogMessages:ServiceStopping"]);
-		IsRunning = false;
+		metrics.IsRunning = false;
 		await server.StopAsync();
 		await base.StopAsync(cancellationToken);
 	}

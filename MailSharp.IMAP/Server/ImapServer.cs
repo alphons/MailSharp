@@ -1,6 +1,6 @@
 ﻿using MailSharp.Common;
 using MailSharp.Common.Services;
-using MailSharp.IMAP.Services;
+using MailSharp.IMAP.Metrics;
 using MailSharp.IMAP.Session;
 using System.Net;
 using System.Net.Sockets;
@@ -14,7 +14,8 @@ public class ImapServer
 	private readonly ILogger<ImapSession> sessionLogger;
 	private readonly AuthenticationService authService;
 	private readonly MailboxService mailboxService;
-	private readonly List<(TcpListener Listener, SecurityEnum security)> listeners = [];
+	private readonly List<ServerContext> listeners = [];
+	private readonly ImapMetrics metrics;
 	private CancellationTokenSource? cts;
 
 	public ImapServer(
@@ -22,37 +23,39 @@ public class ImapServer
 		ILogger<ImapServer> logger,
 		ILogger<ImapSession> sessionLogger,
 		AuthenticationService authService,
-		MailboxService mailboxService)
+		MailboxService mailboxService,
+		ImapMetrics metrics)
 	{
 		this.configuration = configuration;
 		this.logger = logger;
 		this.sessionLogger = sessionLogger;
 		this.authService = authService;
 		this.mailboxService = mailboxService;
+		this.metrics = metrics;
 
 		var ports = configuration.GetSection("ImapSettings:Ports").Get<List<PortConfig>>()
 			?? throw new InvalidOperationException("Ports not configured");
 
 		foreach (var port in ports)
 		{
-			listeners.Add((new TcpListener(IPAddress.Parse(port.Host), port.Port), port.Security));
+			listeners.Add(new(new TcpListener(IPAddress.Parse(port.Host), port.Port), port.Security));
 		}
 	}
 
 	public async Task StartAsync()
 	{
 		cts = new CancellationTokenSource();
-		await Task.WhenAll(listeners.Select(l =>
+		await Task.WhenAll(listeners.Select(context =>
 		{
 			try
 			{
-				l.Listener.Start();
+				context.Listener.Start();
 				var eventIdConfig = configuration.GetSection("ImapEventIds:ServerStarted").Get<EventIdConfig>()
 					?? throw new InvalidOperationException("Missing ImapEventIds:ServerStarted");
 				logger.LogInformation(
 					new EventId(eventIdConfig.Id, eventIdConfig.Name),
 					configuration["ImapLogMessages:ServerStarted"],
-					l.Listener.LocalEndpoint, l.security);
+					context.Listener.LocalEndpoint, context.Security);
 			}
 			catch (SocketException ex)
 			{
@@ -62,20 +65,20 @@ public class ImapServer
 					new EventId(eventIdConfig.Id, eventIdConfig.Name),
 					ex,
 					configuration["ImapLogMessages:ServerStartFailed"],
-					((IPEndPoint)l.Listener.LocalEndpoint).Port);
+					((IPEndPoint)context.Listener.LocalEndpoint).Port);
 			}
-			return Task.Run(() => AcceptClientsAsync(l.Listener, l.security, cts.Token), cts.Token);
+			return Task.Run(() => AcceptClientsAsync(context, cts.Token), cts.Token);
 		}));
 		await StopAsync();
 	}
 
-	private async Task AcceptClientsAsync(TcpListener listener, SecurityEnum security, CancellationToken cancellationToken)
+	private async Task AcceptClientsAsync(ServerContext context, CancellationToken cancellationToken)
 	{
 		while (!cancellationToken.IsCancellationRequested)
 		{
 			try
 			{
-				var client = await listener.AcceptTcpClientAsync(cancellationToken);
+				var client = await context.Listener.AcceptTcpClientAsync(cancellationToken);
 				var eventIdConfig = configuration.GetSection("ImapEventIds:ClientAccepted").Get<EventIdConfig>()
 					?? throw new InvalidOperationException("Missing ImapEventIds:ClientAccepted");
 				logger.LogInformation(
@@ -83,7 +86,7 @@ public class ImapServer
 					configuration["ImapLogMessages:ClientAccepted"],
 					client.Client.RemoteEndPoint);
 
-				var session = new ImapSession(client, configuration, security, authService, mailboxService, sessionLogger);
+				var session = new ImapSession(client, configuration, context.Security, authService, mailboxService, metrics, sessionLogger);
 				_ = session.ProcessAsync(cancellationToken);
 			}
 			catch (OperationCanceledException)
@@ -93,7 +96,7 @@ public class ImapServer
 				logger.LogInformation(
 					new EventId(eventIdConfig.Id, eventIdConfig.Name),
 					configuration["ImapLogMessages:ListenerStopped"],
-					listener.LocalEndpoint);
+					context.Listener.LocalEndpoint);
 				break;
 			}
 			catch (Exception ex)
@@ -104,7 +107,7 @@ public class ImapServer
 					new EventId(eventIdConfig.Id, eventIdConfig.Name),
 					ex,
 					configuration["ImapLogMessages:ClientAcceptError"],
-					listener.LocalEndpoint);
+					context.Listener.LocalEndpoint);
 			}
 		}
 	}
@@ -115,16 +118,16 @@ public class ImapServer
 		{
 			await cts.CancelAsync();
 		}
-		foreach (var (tcplistener, _) in listeners)
+		foreach (var context in listeners)
 		{
-			tcplistener.Stop();
+			context.Listener.Stop();
 			var eventIdConfig = configuration.GetSection("ImapEventIds:ListenerStopped").Get<EventIdConfig>()
 				?? throw new InvalidOperationException("Missing ImapEventIds:ListenerStopped");
 			logger.LogInformation(
 				new EventId(eventIdConfig.Id, eventIdConfig.Name),
 				configuration["ImapLogMessages:ListenerStopped"],
-				tcplistener.LocalEndpoint);
-			tcplistener.Dispose();
+				context.Listener.LocalEndpoint);
+			context.Listener.Dispose();
 		}
 		listeners.Clear();
 	}

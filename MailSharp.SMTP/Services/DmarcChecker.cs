@@ -1,4 +1,5 @@
 ﻿using MailSharp.Common;
+using MailSharp.SMTP.Metrics;
 using System.Net;
 
 namespace MailSharp.SMTP.Services;
@@ -7,6 +8,7 @@ public class DmarcChecker(
 	IConfiguration configuration,
 	DkimVerifier dkimVerifier,
 	SpfChecker spfChecker,
+	SmtpMetrics metrics,
 	ILogger<DmarcChecker> logger)
 {
 
@@ -53,13 +55,23 @@ public class DmarcChecker(
 
 		// Check SPF and DKIM alignment
 		bool spfPass = await spfChecker.CheckSpfAsync(clientIp, mailFromDomain, heloDomain);
+
+		if(spfPass == false)
+			metrics.IncrementRejectedSpf();
+
 		bool dkimPass = await dkimVerifier.VerifyDkimAsync(emlContent, clientIp);
+
+		if(dkimPass == false)
+			metrics.IncrementRejectedDkim();	
 
 		bool spfAligned = spfPass && IsSpfAligned(mailFromDomain, heloDomain);
 		bool dkimAligned = dkimPass && IsDkimAligned(emlContent, mailFromDomain);
 
 		bool dmarcPass = (spfAligned && dmarcFields.GetValueOrDefault("aspf", "r") == "r") ||
 						 (dkimAligned && dmarcFields.GetValueOrDefault("adkim", "r") == "r");
+
+		if(dmarcPass == false)
+			metrics.IncrementRejectedDmarc();
 
 		// Apply DMARC policy
 		switch (policy.ToLower())

@@ -1,5 +1,6 @@
 ﻿using MailSharp.Common;
 using MailSharp.SMTP.Extensions;
+using MailSharp.SMTP.Metrics;
 using MailSharp.SMTP.Server;
 using MailSharp.SMTP.Services;
 using System.Net.Security;
@@ -22,6 +23,7 @@ public enum SmtpState
 
 public partial class SmtpSession
 {
+	private SmtpMetrics metrics;
 	private readonly TcpClient client;
 	private readonly IConfiguration configuration;
 	private readonly SecurityEnum security;
@@ -49,8 +51,10 @@ public partial class SmtpSession
 		SpfChecker spfChecker,
 		DkimVerifier dkimVerifier, 
 		DmarcChecker dmarcChecker,
+		SmtpMetrics metrics,
 		ILogger<SmtpSession> logger)
 	{
+		this.metrics = metrics;
 		this.client = client;
 		this.configuration = configuration;
 		this.security = security;
@@ -80,6 +84,9 @@ public partial class SmtpSession
 				?? throw new InvalidOperationException("Missing SmtpEventIds:SessionStarted");
 			logger.LogInformation(new EventId(eventIdConfig.Id, eventIdConfig.Name), configuration["SmtpLogMessages:SessionStarted"], sessionId, client.Client.RemoteEndPoint);
 		}
+
+		metrics.IncrementConnections();
+		metrics.IncrementActive();
 	}
 
 	private void InitializeHandlers()
@@ -99,7 +106,19 @@ public partial class SmtpSession
 		commandHandlers.Add("STARTTLS", HandleStartTlsAsync);
 	}
 
-	public async Task ProcessAsync(CancellationToken cancellationToken)
+	public Task ProcessAsync(CancellationToken cancellationToken)
+	{
+		var task = ProcessInternalAsync(cancellationToken);
+
+		// Zorgt dat DecrementActive() ALTIJD wordt aangeroepen, zelfs bij exception of cancel
+		_ = task.ContinueWith(
+			t => metrics.DecrementActive(),
+			TaskScheduler.Default);
+
+		return task; // voor als je ooit wil awaiten (kan geen kwaad)
+	}
+
+	public async Task ProcessInternalAsync(CancellationToken cancellationToken)
 	{
 		using (client)
 		using (stream)

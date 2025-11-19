@@ -1,6 +1,5 @@
 ﻿using MailSharp.Common;
 using MailSharp.SMTP.Extensions;
-using MailSharp.SMTP.Server;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -44,6 +43,7 @@ public partial class SmtpSession
 			if (credentials == null)
 			{
 				await writer.WriteLineAsync(configuration["SmtpResponses:AuthFailed"], ct);
+				metrics.IncrementAuthFailed();
 				return;
 			}
 
@@ -54,13 +54,16 @@ public partial class SmtpSession
 				if (credentialParts.Length != 3 || !await ValidateCredentialsAsync(credentialParts[1], credentialParts[2]))
 				{
 					await writer.WriteLineAsync(configuration["SmtpResponses:AuthFailed"], ct);
+					metrics.IncrementAuthFailed();
 					return;
 				}
 				await writer.WriteLineAsync(configuration["SmtpResponses:AuthSuccess"], ct);
+				metrics.IncrementAuthSuccess();
 			}
 			catch
 			{
 				await writer.WriteLineAsync(configuration["SmtpResponses:AuthFailed"], ct);
+				metrics.IncrementAuthFailed();
 			}
 		}
 		else if (mechanism == "CRAM-MD5")
@@ -73,6 +76,7 @@ public partial class SmtpSession
 			if (response == null)
 			{
 				await writer.WriteLineAsync(configuration["SmtpResponses:AuthFailed"], ct);
+				metrics.IncrementAuthFailed();
 				return;
 			}
 
@@ -83,6 +87,7 @@ public partial class SmtpSession
 				if (responseParts.Length != 2)
 				{
 					await writer.WriteLineAsync(configuration["SmtpResponses:AuthFailed"], ct);
+					metrics.IncrementAuthFailed();
 					return;
 				}
 
@@ -92,13 +97,16 @@ public partial class SmtpSession
 				if (password == null || !ValidateCramMd5(challenge, password, clientDigest))
 				{
 					await writer.WriteLineAsync(configuration["SmtpResponses:AuthFailed"], ct);
+					metrics.IncrementAuthFailed();
 					return;
 				}
 				await writer.WriteLineAsync(configuration["SmtpResponses:AuthSuccess"], ct);
+				metrics.IncrementAuthSuccess();
 			}
 			catch
 			{
 				await writer.WriteLineAsync(configuration["SmtpResponses:AuthFailed"], ct);
+				metrics.IncrementAuthFailed();
 			}
 		}
 		else if (mechanism == "LOGIN")
@@ -109,6 +117,7 @@ public partial class SmtpSession
 			if (usernameBase64 == null)
 			{
 				await writer.WriteLineAsync(configuration["SmtpResponses:AuthFailed"], ct);
+				metrics.IncrementAuthFailed();
 				return;
 			}
 
@@ -117,6 +126,7 @@ public partial class SmtpSession
 			if (passwordBase64 == null)
 			{
 				await writer.WriteLineAsync(configuration["SmtpResponses:AuthFailed"], ct);
+				metrics.IncrementAuthFailed();
 				return;
 			}
 
@@ -127,13 +137,16 @@ public partial class SmtpSession
 				if (!await ValidateCredentialsAsync(username, password))
 				{
 					await writer.WriteLineAsync(configuration["SmtpResponses:AuthFailed"], ct);
+					metrics.IncrementAuthFailed();
 					return;
 				}
 				await writer.WriteLineAsync(configuration["SmtpResponses:AuthSuccess"], ct);
+				metrics.IncrementAuthSuccess();
 			}
 			catch
 			{
 				await writer.WriteLineAsync(configuration["SmtpResponses:AuthFailed"], ct);
+				metrics.IncrementAuthFailed();
 			}
 		}
 		else
