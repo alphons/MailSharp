@@ -33,7 +33,7 @@ public partial class SmtpSession
 		{
 			string certPath = configuration["SmtpSettings:CertificatePath"] ?? throw new InvalidOperationException("CertificatePath not configured");
 			string certPassword = configuration["SmtpSettings:CertificatePassword"] ?? string.Empty;
-			X509Certificate2 certificate = new(certPath, certPassword);
+			X509Certificate2 certificate = X509CertificateLoader.LoadPkcs12FromFile(certPath, certPassword);
 
 			SslStream sslStream = new(stream, false);
 			await sslStream.AuthenticateAsServerAsync(certificate, false, System.Security.Authentication.SslProtocols.Tls12 | System.Security.Authentication.SslProtocols.Tls13, false);
