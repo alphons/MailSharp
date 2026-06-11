@@ -1,0 +1,8 @@
+<Solution>
+  <Project Path="MailSharp.Common/MailSharp.Common.csproj" />
+  <Project Path="MailSharp.IMAP/MailSharp.IMAP.csproj" />
+  <Project Path="MailSharp.POP3/MailSharp.POP3.csproj" />
+  <Project Path="MailSharp.SMTP/MailSharp.SMTP.csproj" />
+  <Project Path="MailSharp.TestFormApp/MailSharp.TestFormApp.csproj" />
+  <Project Path="MailSharp.WebManager/MailSharp.WebManager.csproj" />
+</Solution>
