@@ -1,6 +1,6 @@
-﻿@page
+@page
 @{
-	ViewData["Title"] = "Home";
+	ViewData["Title"] = "MailSharp Manager";
 }
 <!DOCTYPE html>
 <html lang="en">
@@ -8,78 +8,239 @@
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 	<title>@ViewData["Title"]</title>
+	<link rel="stylesheet" href="~/styles/mailsharp.css">
 	<script src="~/scripts/macros.js" defer></script>
 	<script src="~/scripts/netproxy.js" defer></script>
 	<script src="~/default.js" defer></script>
-	<style>
-		body
-		{
-			font-family: Arial, sans-serif;
-			display: flex;
-			justify-content: center;
-			align-items: center;
-			height: 100vh;
-			margin: 0;
-			background-color: #f0f0f0;
-		}
-
-		.container
-		{
-			background-color: white;
-			padding: 20px;
-			border-radius: 8px;
-			box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-			text-align: center;
-			width: 100%;
-			max-width: 400px;
-		}
-
-		h1
-		{
-			font-size: 24px;
-		}
-
-		a
-		{
-			color: #007bff;
-			text-decoration: none;
-		}
-
-			a:hover
-			{
-				text-decoration: underline;
-			}
-
-		@@media (max-width: 600px)
-		{
-			.container
-			{
-				margin: 10px;
-				padding: 15px;
-			}
-
-			h1
-			{
-				font-size: 20px;
-			}
-		}
-	</style>
 </head>
 <body>
-	<div class="container">
-		<h1>Welcome, @User.Identity?.Name</h1>
-		@if (User.Identity?.IsAuthenticated == true)
-		{
-			<p><a href="/Account/Logout">Logout</a></p>
-			<p>
-				<a href="#" id="getstatus">Get Status of SMTP server</a>
-				<pre id="status"></pre>
-			</p>
-		}
-		else
-		{
-			<p><a href="/Account/Login">Login</a></p>
-		}
+@if (User.Identity?.IsAuthenticated == true)
+{
+	<header class="app-header">
+		<div class="app-header__brand">
+			<div class="app-header__logo">MS</div>
+			<span class="app-header__title">MailSharp Manager</span>
+		</div>
+		<div class="app-header__right">
+			<span class="app-header__status" id="header-status">Loading…</span>
+			<span class="app-header__user">@User.Identity.Name</span>
+			<a class="app-header__logout" href="/Account/Logout">Logout</a>
+		</div>
+	</header>
+
+	<main class="app-main">
+
+		<nav class="tab-nav">
+			<button class="tab-btn active" id="tab-smtp" data-panel="panel-smtp">
+				<span class="tab-dot"></span>SMTP
+			</button>
+			<button class="tab-btn" id="tab-imap" data-panel="panel-imap">
+				<span class="tab-dot"></span>IMAP
+			</button>
+			<button class="tab-btn" id="tab-pop3" data-panel="panel-pop3">
+				<span class="tab-dot"></span>POP3
+			</button>
+		</nav>
+
+		<!-- ── SMTP ───────────────────────────────────────── -->
+		<div class="tab-panel active" id="panel-smtp">
+
+			<div class="section-label">Connections &amp; Traffic</div>
+			<div class="stats-grid">
+				<div class="stat-card stat-card--blue">
+					<div class="stat-card__label">Total Connections</div>
+					<div class="stat-card__value" id="smtp-total-conn">—</div>
+				</div>
+				<div class="stat-card">
+					<div class="stat-card__label">Active Sessions</div>
+					<div class="stat-card__value" id="smtp-active">—</div>
+				</div>
+				<div class="stat-card stat-card--green">
+					<div class="stat-card__label">Messages Received</div>
+					<div class="stat-card__value" id="smtp-recv">—</div>
+					<div class="stat-card__sub" id="smtp-last-msg">—</div>
+				</div>
+				<div class="stat-card">
+					<div class="stat-card__label">Messages Relayed</div>
+					<div class="stat-card__value" id="smtp-relayed">—</div>
+				</div>
+				<div class="stat-card stat-card--amber">
+					<div class="stat-card__label">Data Received</div>
+					<div class="stat-card__value" id="smtp-bytes">—</div>
+				</div>
+				<div class="stat-card">
+					<div class="stat-card__label">Uptime</div>
+					<div class="stat-card__value" id="smtp-uptime">—</div>
+					<div class="stat-card__sub" id="smtp-started">—</div>
+				</div>
+			</div>
+
+			<div class="section-label">Authentication</div>
+			<div class="stats-grid">
+				<div class="stat-card stat-card--green">
+					<div class="stat-card__label">Auth Success</div>
+					<div class="stat-card__value" id="smtp-auth-ok">—</div>
+				</div>
+				<div class="stat-card stat-card--red">
+					<div class="stat-card__label">Auth Failed</div>
+					<div class="stat-card__value" id="smtp-auth-fail">—</div>
+				</div>
+			</div>
+
+			<div class="section-label">Rejections</div>
+			<div class="rejection-panel">
+				<div class="bar-row">
+					<div class="bar-meta"><span class="bar-name">SPF</span><span class="bar-count" id="smtp-rej-spf">—</span></div>
+					<div class="bar-track"><div class="bar-fill bar-fill--red" id="bar-spf"></div></div>
+				</div>
+				<div class="bar-row">
+					<div class="bar-meta"><span class="bar-name">DKIM</span><span class="bar-count" id="smtp-rej-dkim">—</span></div>
+					<div class="bar-track"><div class="bar-fill bar-fill--amber" id="bar-dkim"></div></div>
+				</div>
+				<div class="bar-row">
+					<div class="bar-meta"><span class="bar-name">DMARC</span><span class="bar-count" id="smtp-rej-dmarc">—</span></div>
+					<div class="bar-track"><div class="bar-fill bar-fill--purple" id="bar-dmarc"></div></div>
+				</div>
+			</div>
+
+			<div class="section-label">Top Domains</div>
+			<div class="tables-row">
+				<div class="domain-card">
+					<div class="domain-card__header">Top Senders</div>
+					<div id="smtp-tbl-senders"><div class="domain-card__empty">No data yet</div></div>
+				</div>
+				<div class="domain-card">
+					<div class="domain-card__header">Top Recipients</div>
+					<div id="smtp-tbl-recipients"><div class="domain-card__empty">No data yet</div></div>
+				</div>
+			</div>
+		</div>
+
+		<!-- ── IMAP ───────────────────────────────────────── -->
+		<div class="tab-panel" id="panel-imap">
+
+			<div class="section-label">Connections &amp; Traffic</div>
+			<div class="stats-grid">
+				<div class="stat-card stat-card--blue">
+					<div class="stat-card__label">Total Connections</div>
+					<div class="stat-card__value" id="imap-total-conn">—</div>
+				</div>
+				<div class="stat-card">
+					<div class="stat-card__label">Active Sessions</div>
+					<div class="stat-card__value" id="imap-active">—</div>
+				</div>
+				<div class="stat-card stat-card--green">
+					<div class="stat-card__label">Messages Fetched</div>
+					<div class="stat-card__value" id="imap-fetched">—</div>
+					<div class="stat-card__sub" id="imap-last-activity">—</div>
+				</div>
+				<div class="stat-card stat-card--amber">
+					<div class="stat-card__label">Data Sent</div>
+					<div class="stat-card__value" id="imap-bytes">—</div>
+				</div>
+				<div class="stat-card">
+					<div class="stat-card__label">Commands</div>
+					<div class="stat-card__value" id="imap-commands">—</div>
+				</div>
+				<div class="stat-card">
+					<div class="stat-card__label">Folder Selects</div>
+					<div class="stat-card__value" id="imap-folder-selects">—</div>
+				</div>
+				<div class="stat-card">
+					<div class="stat-card__label">Uptime</div>
+					<div class="stat-card__value" id="imap-uptime">—</div>
+					<div class="stat-card__sub" id="imap-started">—</div>
+				</div>
+			</div>
+
+			<div class="section-label">Authentication</div>
+			<div class="stats-grid">
+				<div class="stat-card stat-card--green">
+					<div class="stat-card__label">Login Success</div>
+					<div class="stat-card__value" id="imap-auth-ok">—</div>
+				</div>
+				<div class="stat-card stat-card--red">
+					<div class="stat-card__label">Login Failed</div>
+					<div class="stat-card__value" id="imap-auth-fail">—</div>
+				</div>
+			</div>
+
+			<div class="section-label">Top Users</div>
+			<div class="domain-card">
+				<div class="domain-card__header">Most Active Accounts</div>
+				<div id="imap-tbl-users"><div class="domain-card__empty">No data yet</div></div>
+			</div>
+		</div>
+
+		<!-- ── POP3 ───────────────────────────────────────── -->
+		<div class="tab-panel" id="panel-pop3">
+
+			<div class="section-label">Connections &amp; Traffic</div>
+			<div class="stats-grid">
+				<div class="stat-card stat-card--blue">
+					<div class="stat-card__label">Total Connections</div>
+					<div class="stat-card__value" id="pop3-total-conn">—</div>
+				</div>
+				<div class="stat-card">
+					<div class="stat-card__label">Active Sessions</div>
+					<div class="stat-card__value" id="pop3-active">—</div>
+				</div>
+				<div class="stat-card stat-card--green">
+					<div class="stat-card__label">Messages Retrieved</div>
+					<div class="stat-card__value" id="pop3-retrieved">—</div>
+					<div class="stat-card__sub" id="pop3-last-activity">—</div>
+				</div>
+				<div class="stat-card stat-card--red">
+					<div class="stat-card__label">Messages Deleted</div>
+					<div class="stat-card__value" id="pop3-deleted">—</div>
+				</div>
+				<div class="stat-card stat-card--amber">
+					<div class="stat-card__label">Data Sent</div>
+					<div class="stat-card__value" id="pop3-bytes">—</div>
+				</div>
+				<div class="stat-card">
+					<div class="stat-card__label">Uptime</div>
+					<div class="stat-card__value" id="pop3-uptime">—</div>
+					<div class="stat-card__sub" id="pop3-started">—</div>
+				</div>
+			</div>
+
+			<div class="section-label">Authentication</div>
+			<div class="stats-grid">
+				<div class="stat-card stat-card--green">
+					<div class="stat-card__label">Login Success</div>
+					<div class="stat-card__value" id="pop3-auth-ok">—</div>
+				</div>
+				<div class="stat-card stat-card--red">
+					<div class="stat-card__label">Login Failed</div>
+					<div class="stat-card__value" id="pop3-auth-fail">—</div>
+				</div>
+			</div>
+
+			<div class="section-label">Top Users</div>
+			<div class="domain-card">
+				<div class="domain-card__header">Most Active Accounts</div>
+				<div id="pop3-tbl-users"><div class="domain-card__empty">No data yet</div></div>
+			</div>
+		</div>
+
+		<div class="refresh-bar">
+			<div class="refresh-dot" id="refresh-dot"></div>
+			<span>Updated <span id="refresh-time">—</span></span>
+		</div>
+
+	</main>
+}
+else
+{
+	<div class="auth-page">
+		<div class="auth-card denied-card">
+			<div class="auth-card__logo">MS</div>
+			<div class="auth-card__title">MailSharp Manager</div>
+			<div class="auth-card__sub">Sign in to continue</div>
+			<a href="/Account/Login" class="btn-primary" style="display:block;text-align:center;">Go to Login</a>
+		</div>
 	</div>
+}
 </body>
 </html>

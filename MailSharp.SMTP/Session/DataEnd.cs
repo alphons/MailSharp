@@ -75,7 +75,11 @@ public partial class SmtpSession
 
 		logger.LogInformation("Received email from {MailFrom} to {RcptTo} saved as {FileName}", mailFrom, string.Join(", ", rcptTo), fileName);
 
-		metrics.IncrementReceived();
+		string senderDomain = mailFrom!.Contains('@') ? mailFrom[(mailFrom.IndexOf('@') + 1)..] : mailFrom;
+		var rcptDomains = rcptTo
+			.Where(r => r.Contains('@'))
+			.Select(r => r[(r.IndexOf('@') + 1)..]);
+		metrics.MessageReceived(senderDomain, rcptDomains, signedEml.Length);
 
 		mailFrom = null;
 		rcptTo.Clear();

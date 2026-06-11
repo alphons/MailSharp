@@ -22,6 +22,8 @@ public class ImapSession(
 
 	public async Task ProcessAsync(CancellationToken cancellationToken)
 	{
+		metrics.IncrementConnections();
+		metrics.IncrementActive();
 		try
 		{
 			stream = security == SecurityEnum.Tls ? await InitializeTlsStreamAsync() : client.GetStream();
@@ -43,6 +45,7 @@ public class ImapSession(
 				}
 				string tag = parts[0];
 				string cmd = parts[1].ToUpper();
+				metrics.IncrementCommands();
 				switch (cmd)
 				{
 					case "LOGIN":
@@ -53,6 +56,10 @@ public class ImapSession(
 						}
 						username = parts[2];
 						isAuthenticated = await authService.AuthenticateAsync(username, parts[3], cancellationToken);
+						if (isAuthenticated)
+							metrics.LoginSucceeded(username);
+						else
+							metrics.IncrementLoginFailed();
 						await SendResponseAsync(
 							isAuthenticated ? $"{tag} OK LOGIN completed" : $"{tag} NO LOGIN failed",
 							cancellationToken);
@@ -76,6 +83,7 @@ public class ImapSession(
 							await SendResponseAsync($"{tag} NO Authentication required", cancellationToken);
 							continue;
 						}
+						metrics.IncrementFolderSelects();
 						if (parts.Length != 3)
 						{
 							await SendResponseAsync($"{tag} BAD SELECT requires folder name", cancellationToken);
@@ -166,6 +174,7 @@ public class ImapSession(
 								await SendResponseAsync($"* {seqNum} FETCH (BODY[] {{{content.Length}}}", cancellationToken);
 								await SendResponseAsync(content, cancellationToken);
 								await SendResponseAsync(")", cancellationToken);
+								metrics.MessageFetched(content.Length);
 							}
 						}
 						await SendResponseAsync($"{tag} OK FETCH completed", cancellationToken);
@@ -234,6 +243,7 @@ public class ImapSession(
 		}
 		finally
 		{
+			metrics.DecrementActive();
 			stream?.Dispose();
 			client.Close();
 		}

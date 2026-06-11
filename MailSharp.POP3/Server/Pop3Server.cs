@@ -86,7 +86,7 @@ public class Pop3Server
 					configuration["Pop3LogMessages:ClientAccepted"],
 					client.Client.RemoteEndPoint);
 
-				var session = new Pop3Session(client, configuration, context.Security, authService, mailboxService, sessionLogger);
+				var session = new Pop3Session(client, configuration, context.Security, authService, mailboxService, pop3Metrics, sessionLogger);
 				_ = session.ProcessAsync(cancellationToken);
 			}
 			catch (OperationCanceledException)

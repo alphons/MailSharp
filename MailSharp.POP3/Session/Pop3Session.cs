@@ -1,5 +1,6 @@
 ﻿using MailSharp.Common;
 using MailSharp.Common.Services;
+using MailSharp.POP3.Metrics;
 using System.Net.Sockets;
 using System.Security.Cryptography.X509Certificates;
 using System.Net.Security;
@@ -13,12 +14,15 @@ public class Pop3Session(
 	SecurityEnum security,
 	AuthenticationService authService,
 	MailboxService mailboxService,
+	Pop3Metrics metrics,
 	ILogger<Pop3Session> logger)
 {
 	private Stream? stream;
 
 	public async Task ProcessAsync(CancellationToken cancellationToken)
 	{
+		metrics.IncrementConnections();
+		metrics.IncrementActive();
 		try
 		{
 			stream = security == SecurityEnum.Tls ? await InitializeTlsStreamAsync() : client.GetStream();
@@ -56,6 +60,10 @@ public class Pop3Session(
 							continue;
 						}
 						isAuthenticated = await authService.AuthenticateAsync(username, parts[1], cancellationToken);
+						if (isAuthenticated)
+							metrics.LoginSucceeded(username);
+						else
+							metrics.IncrementLoginFailed();
 						await SendResponseAsync(
 							isAuthenticated ? "+OK Authentication successful" : "-ERR Authentication failed",
 							cancellationToken);
@@ -106,6 +114,7 @@ public class Pop3Session(
 						await SendResponseAsync($"+OK {content.Length} octets", cancellationToken);
 						await SendResponseAsync(content, cancellationToken);
 						await SendResponseAsync(".", cancellationToken);
+						metrics.MessageRetrieved(content.Length);
 						break;
 					case "QUIT":
 						await SendResponseAsync("+OK POP3 server signing off", cancellationToken);
@@ -128,6 +137,7 @@ public class Pop3Session(
 		}
 		finally
 		{
+			metrics.DecrementActive();
 			stream?.Dispose();
 			client.Close();
 		}
