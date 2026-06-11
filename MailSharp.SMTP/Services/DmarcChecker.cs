@@ -1,4 +1,5 @@
 ﻿using MailSharp.Common;
+using MailSharp.DNS;
 using MailSharp.SMTP.Metrics;
 using System.Net;
 
@@ -6,6 +7,7 @@ namespace MailSharp.SMTP.Services;
 
 public class DmarcChecker(
 	IConfiguration configuration,
+	Resolver resolver,
 	DkimVerifier dkimVerifier,
 	SpfChecker spfChecker,
 	SmtpMetrics metrics,
@@ -103,13 +105,13 @@ public class DmarcChecker(
 	{
 		try
 		{
-			string query = $"_dmarc.{domain}";
-			var result = await Dns.GetHostEntryAsync(query, cancellationToken);
-			string[] txtRecords = result.Aliases
-				.Select(a => Dns.GetHostEntry(a).HostName)
-				.Where(h => h.StartsWith("v=DMARC1", StringComparison.OrdinalIgnoreCase))
-				.ToArray();
-			return txtRecords.FirstOrDefault();
+			string host = configuration["DmarcSettings:DnsServer"] ?? "8.8.8.8";
+			int port = configuration.GetValue<int?>("DmarcSettings:DnsPort") ?? 53;
+			var dnsServer = new IPEndPoint(IPAddress.Parse(host), port);
+			var response = await resolver.QueryAsync(dnsServer, $"_dmarc.{domain}", DnsQType.TXT, DnsQClass.IN, cancellationToken);
+			return response.RecordsTXT
+				.SelectMany(r => r.Texts)
+				.FirstOrDefault(t => t.StartsWith("v=DMARC1", StringComparison.OrdinalIgnoreCase));
 		}
 		catch
 		{

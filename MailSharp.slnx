@@ -1,5 +1,6 @@
 <Solution>
   <Project Path="MailSharp.Common/MailSharp.Common.csproj" />
+  <Project Path="MailSharp.DNS/MailSharp.DNS.csproj" Id="853dd9a2-5577-451b-88cb-ddcfc15e059c" />
   <Project Path="MailSharp.IMAP/MailSharp.IMAP.csproj" />
   <Project Path="MailSharp.POP3/MailSharp.POP3.csproj" />
   <Project Path="MailSharp.SMTP/MailSharp.SMTP.csproj" />

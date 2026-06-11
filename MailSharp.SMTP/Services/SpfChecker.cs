@@ -1,39 +1,31 @@
-﻿using MailSharp.SMTP.Metrics;
+using MailSharp.DNS;
 using System.Net;
 
 namespace MailSharp.SMTP.Services;
 
-public class SpfChecker(IConfiguration configuration)
+public class SpfChecker(IConfiguration configuration, Resolver resolver)
 {
-
-	// Check SPF for incoming email
-	public async Task<bool> CheckSpfAsync(string clientIp, string mailFromDomain, string heloDomain)
+	public async Task<bool> CheckSpfAsync(string clientIp, string mailFromDomain, string heloDomain, CancellationToken cancellationToken = default)
 	{
-		// Resolve SPF record via DNS
-		string spfRecord = await ResolveSpfRecordAsync(mailFromDomain)
-			?? await ResolveSpfRecordAsync(heloDomain)
+		string spfRecord = await ResolveSpfRecordAsync(mailFromDomain, cancellationToken)
+			?? await ResolveSpfRecordAsync(heloDomain, cancellationToken)
 			?? string.Empty;
 
 		if (string.IsNullOrEmpty(spfRecord))
-		{
-			return false; // No SPF record, fail open
-		}
+			return false;
 
-		// Parse and evaluate SPF record
-		return EvaluateSpfRecord(spfRecord, clientIp, mailFromDomain);
+		return await EvaluateSpfRecordAsync(spfRecord, clientIp, mailFromDomain, cancellationToken);
 	}
 
-	// Resolve SPF record via DNS TXT lookup
-	private static async Task<string?> ResolveSpfRecordAsync(string domain)
+	private async Task<string?> ResolveSpfRecordAsync(string domain, CancellationToken cancellationToken)
 	{
 		try
 		{
-			var result = await Dns.GetHostEntryAsync(domain);
-			string[] txtRecords = [.. result.Aliases
-				.Select(a => Dns.GetHostEntry(a).HostName)
-				.Where(h => h.StartsWith("v=spf1", StringComparison.OrdinalIgnoreCase))];
-
-			return txtRecords.FirstOrDefault();
+			var dnsServer = GetDnsServer();
+			var response = await resolver.QueryAsync(dnsServer, domain, DnsQType.TXT, DnsQClass.IN, cancellationToken);
+			return response.RecordsTXT
+				.SelectMany(r => r.Texts)
+				.FirstOrDefault(t => t.StartsWith("v=spf1", StringComparison.OrdinalIgnoreCase));
 		}
 		catch
 		{
@@ -41,61 +33,46 @@ public class SpfChecker(IConfiguration configuration)
 		}
 	}
 
-	// Evaluate SPF record against client IP
-	private static bool EvaluateSpfRecord(string spfRecord, string clientIp, string mailFromDomain)
+	private async Task<bool> EvaluateSpfRecordAsync(string spfRecord, string clientIp, string mailFromDomain, CancellationToken cancellationToken)
 	{
 		if (!spfRecord.StartsWith("v=spf1", StringComparison.OrdinalIgnoreCase))
-		{
 			return false;
-		}
 
 		string[] mechanisms = spfRecord.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-		bool isMatch = false;
 
-		foreach (string mechanism in mechanisms.Skip(1)) // Skip v=spf1
+		foreach (string mechanism in mechanisms.Skip(1))
 		{
 			if (mechanism.StartsWith("ip4:"))
 			{
-				string ipRange = mechanism[4..];
-				if (IsIpInRange(clientIp, ipRange))
-				{
-					isMatch = true;
-					break;
-				}
+				if (IsIpInRange(clientIp, mechanism[4..]))
+					return true;
 			}
 			else if (mechanism.StartsWith("include:"))
 			{
 				string includeDomain = mechanism[8..];
-				string? includeSpf = ResolveSpfRecordAsync(includeDomain).GetAwaiter().GetResult();
-				if (includeSpf != null && EvaluateSpfRecord(includeSpf, clientIp, mailFromDomain))
-				{
-					isMatch = true;
-					break;
-				}
+				string? includeSpf = await ResolveSpfRecordAsync(includeDomain, cancellationToken);
+				if (includeSpf != null && await EvaluateSpfRecordAsync(includeSpf, clientIp, mailFromDomain, cancellationToken))
+					return true;
 			}
 			else if (mechanism == "-all")
 			{
-				isMatch = false;
-				break;
+				return false;
 			}
 			else if (mechanism == "+all")
 			{
-				isMatch = true;
-				break;
+				return true;
 			}
 		}
 
-		return isMatch;
+		return false;
 	}
 
-	// Check if client IP is in the specified range (simplified)
 	private static bool IsIpInRange(string clientIp, string ipRange)
 	{
 		try
 		{
 			if (ipRange.Contains('/'))
 			{
-				// Handle CIDR notation (e.g., 192.168.1.0/24)
 				var parts = ipRange.Split('/');
 				var networkAddress = IPAddress.Parse(parts[0]);
 				var cidr = int.Parse(parts[1]);
@@ -109,9 +86,7 @@ public class SpfChecker(IConfiguration configuration)
 				for (int i = 0; i < maskBytes; i++)
 				{
 					if (networkBytes[i] != clientBytes[i])
-					{
 						return false;
-					}
 				}
 
 				if (maskRemainder > 0)
@@ -129,5 +104,12 @@ public class SpfChecker(IConfiguration configuration)
 		{
 			return false;
 		}
+	}
+
+	private IPEndPoint GetDnsServer()
+	{
+		string host = configuration["SpfSettings:DnsServer"] ?? "8.8.8.8";
+		int port = configuration.GetValue<int?>("SpfSettings:DnsPort") ?? 53;
+		return new IPEndPoint(IPAddress.Parse(host), port);
 	}
 }

@@ -9,6 +9,7 @@
 
 	<ItemGroup>
 	  <ProjectReference Include="..\MailSharp.Common\MailSharp.Common.csproj" />
+	  <ProjectReference Include="..\MailSharp.DNS\MailSharp.DNS.csproj" />
 	</ItemGroup>
 
 </Project>
