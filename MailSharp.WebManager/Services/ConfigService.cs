@@ -3,7 +3,7 @@ using System.Text.Json.Nodes;
 
 namespace MailSharp.WebManager.Services;
 
-public class ConfigService(IConfiguration configuration, IWebHostEnvironment env)
+public class ConfigService(IWebHostEnvironment env)
 {
 	private static readonly JsonSerializerOptions Pretty = new() { WriteIndented = true };
 
@@ -11,54 +11,69 @@ public class ConfigService(IConfiguration configuration, IWebHostEnvironment env
 
 	// ── Read ────────────────────────────────────────────────
 
-	public SmtpConfigDto GetSmtp() => new()
+	public SmtpConfigDto    GetSmtp()    => MakeSmtpDto(BuildMerged());
+	public Pop3ConfigDto    GetPop3()    => MakePop3Dto(BuildMerged());
+	public ImapConfigDto    GetImap()    => MakeImapDto(BuildMerged());
+	public DmarcConfigDto   GetDmarc()   => MakeDmarcDto(BuildMerged());
+	public MailboxConfigDto GetMailbox() => MakeMailboxDto(BuildMerged());
+
+	private IConfiguration BuildMerged()
 	{
-		EmlStoragePath        = configuration["SmtpSettings:EmlStoragePath"] ?? string.Empty,
-		MaxMessageSize        = configuration.GetValue<int>("SmtpSettings:MaxMessageSize"),
-		CommandTimeoutSeconds = configuration.GetValue<int>("SmtpSettings:CommandTimeoutSeconds"),
-		BackLog               = configuration.GetValue<int>("SmtpSettings:BackLog"),
-		EnableAuth            = configuration.GetValue<bool>("SmtpSettings:EnableAuth"),
-		EnableStartTls        = configuration.GetValue<bool>("SmtpSettings:EnableStartTls"),
-		EnableVrfy            = configuration.GetValue<bool>("SmtpSettings:EnableVrfy"),
-		EnableExpn            = configuration.GetValue<bool>("SmtpSettings:EnableExpn"),
-		RequireDkim           = configuration.GetValue<bool>("SmtpSettings:RequireDkim"),
-		CertificatePath       = configuration["SmtpSettings:CertificatePath"] ?? string.Empty,
-		CertificatePassword   = configuration["SmtpSettings:CertificatePassword"] ?? string.Empty,
-		UserStorePath         = configuration["SmtpSettings:UserStorePath"] ?? string.Empty,
-		DnsResolvers          = configuration.GetSection("SmtpSettings:DnsResolvers").Get<List<string>>() ?? [],
-		LocalDomains          = configuration.GetSection("SmtpSettings:LocalDomains").Get<List<string>>() ?? [],
-		RelayQueuePath        = configuration["SmtpSettings:RelayQueuePath"] ?? string.Empty,
-		RelayUseTls           = configuration.GetValue<bool>("SmtpSettings:RelayUseTls"),
-		RelayTimeoutSeconds   = configuration.GetValue<int>("SmtpSettings:RelayTimeoutSeconds"),
-		RelayRequiresAuth     = configuration.GetValue<bool>("SmtpSettings:RelayRequiresAuth"),
-		RelayUsername         = configuration["SmtpSettings:RelayUsername"] ?? string.Empty,
-		RelayPassword         = configuration["SmtpSettings:RelayPassword"] ?? string.Empty,
-		Ports                 = configuration.GetSection("SmtpSettings:Ports").Get<List<PortConfigDto>>() ?? []
+		return new ConfigurationBuilder()
+			.SetBasePath(env.ContentRootPath)
+			.AddJsonFile("appsettings.json", optional: true)
+			.AddJsonFile("mailsharp.override.json", optional: true)
+			.Build();
+	}
+
+	private static SmtpConfigDto MakeSmtpDto(IConfiguration c) => new()
+	{
+		EmlStoragePath        = c["SmtpSettings:EmlStoragePath"] ?? string.Empty,
+		MaxMessageSize        = c.GetValue<int>("SmtpSettings:MaxMessageSize"),
+		CommandTimeoutSeconds = c.GetValue<int>("SmtpSettings:CommandTimeoutSeconds"),
+		BackLog               = c.GetValue<int>("SmtpSettings:BackLog"),
+		EnableAuth            = c.GetValue<bool>("SmtpSettings:EnableAuth"),
+		EnableStartTls        = c.GetValue<bool>("SmtpSettings:EnableStartTls"),
+		EnableVrfy            = c.GetValue<bool>("SmtpSettings:EnableVrfy"),
+		EnableExpn            = c.GetValue<bool>("SmtpSettings:EnableExpn"),
+		RequireDkim           = c.GetValue<bool>("SmtpSettings:RequireDkim"),
+		CertificatePath       = c["SmtpSettings:CertificatePath"] ?? string.Empty,
+		CertificatePassword   = c["SmtpSettings:CertificatePassword"] ?? string.Empty,
+		UserStorePath         = c["SmtpSettings:UserStorePath"] ?? string.Empty,
+		DnsResolvers          = c.GetSection("SmtpSettings:DnsResolvers").Get<List<string>>() ?? [],
+		LocalDomains          = c.GetSection("SmtpSettings:LocalDomains").Get<List<string>>() ?? [],
+		RelayQueuePath        = c["SmtpSettings:RelayQueuePath"] ?? string.Empty,
+		RelayUseTls           = c.GetValue<bool>("SmtpSettings:RelayUseTls"),
+		RelayTimeoutSeconds   = c.GetValue<int>("SmtpSettings:RelayTimeoutSeconds"),
+		RelayRequiresAuth     = c.GetValue<bool>("SmtpSettings:RelayRequiresAuth"),
+		RelayUsername         = c["SmtpSettings:RelayUsername"] ?? string.Empty,
+		RelayPassword         = c["SmtpSettings:RelayPassword"] ?? string.Empty,
+		Ports                 = c.GetSection("SmtpSettings:Ports").Get<List<PortConfigDto>>() ?? []
 	};
 
-	public Pop3ConfigDto GetPop3() => new()
+	private static Pop3ConfigDto MakePop3Dto(IConfiguration c) => new()
 	{
-		CertificatePath     = configuration["Pop3Settings:CertificatePath"] ?? string.Empty,
-		CertificatePassword = configuration["Pop3Settings:CertificatePassword"] ?? string.Empty,
-		Ports               = configuration.GetSection("Pop3Settings:Ports").Get<List<PortConfigDto>>() ?? []
+		CertificatePath     = c["Pop3Settings:CertificatePath"] ?? string.Empty,
+		CertificatePassword = c["Pop3Settings:CertificatePassword"] ?? string.Empty,
+		Ports               = c.GetSection("Pop3Settings:Ports").Get<List<PortConfigDto>>() ?? []
 	};
 
-	public ImapConfigDto GetImap() => new()
+	private static ImapConfigDto MakeImapDto(IConfiguration c) => new()
 	{
-		CertificatePath     = configuration["ImapSettings:CertificatePath"] ?? string.Empty,
-		CertificatePassword = configuration["ImapSettings:CertificatePassword"] ?? string.Empty,
-		Ports               = configuration.GetSection("ImapSettings:Ports").Get<List<PortConfigDto>>() ?? []
+		CertificatePath     = c["ImapSettings:CertificatePath"] ?? string.Empty,
+		CertificatePassword = c["ImapSettings:CertificatePassword"] ?? string.Empty,
+		Ports               = c.GetSection("ImapSettings:Ports").Get<List<PortConfigDto>>() ?? []
 	};
 
-	public DmarcConfigDto GetDmarc() => new()
+	private static DmarcConfigDto MakeDmarcDto(IConfiguration c) => new()
 	{
-		FailOpen      = configuration.GetValue<bool>("DmarcSettings:FailOpen"),
-		RequireDmarc  = configuration.GetValue<bool>("DmarcSettings:RequireDmarc")
+		FailOpen     = c.GetValue<bool>("DmarcSettings:FailOpen"),
+		RequireDmarc = c.GetValue<bool>("DmarcSettings:RequireDmarc")
 	};
 
-	public MailboxConfigDto GetMailbox() => new()
+	private static MailboxConfigDto MakeMailboxDto(IConfiguration c) => new()
 	{
-		StoragePath = configuration["MailboxSettings:StoragePath"] ?? string.Empty
+		StoragePath = c["MailboxSettings:StoragePath"] ?? string.Empty
 	};
 
 	// ── Write ───────────────────────────────────────────────
@@ -74,6 +89,42 @@ public class ConfigService(IConfiguration configuration, IWebHostEnvironment env
 		var root = ReadOverride();
 		root[key] = JsonNode.Parse(JsonSerializer.Serialize(dto, Pretty))!;
 		File.WriteAllText(OverridePath, root.ToJsonString(Pretty));
+	}
+
+	// ── Startup initialisation ──────────────────────────────
+
+	public void EnsureOverrideInitialized()
+	{
+		var root   = ReadOverride();
+		bool dirty = false;
+
+		// Build an appsettings-only config so we always get the canonical defaults,
+		// even when the override file already exists but contains empty strings from
+		// a previous failed save.
+		var src = new ConfigurationBuilder()
+			.SetBasePath(env.ContentRootPath)
+			.AddJsonFile("appsettings.json", optional: false)
+			.Build();
+
+		void TrySeed(string section, string? probe, Func<IConfiguration, object> factory)
+		{
+			bool empty = probe is null
+				? !root.ContainsKey(section)
+				: string.IsNullOrEmpty(root[section]?[probe]?.GetValue<string>());
+			if (empty)
+			{
+				root[section] = JsonNode.Parse(JsonSerializer.Serialize(factory(src), Pretty))!;
+				dirty = true;
+			}
+		}
+
+		TrySeed("SmtpSettings",    "EmlStoragePath", c => MakeSmtpDto(c));
+		TrySeed("Pop3Settings",    "CertificatePath", c => MakePop3Dto(c));
+		TrySeed("ImapSettings",    "CertificatePath", c => MakeImapDto(c));
+		TrySeed("DmarcSettings",   null,              c => MakeDmarcDto(c));
+		TrySeed("MailboxSettings", "StoragePath",     c => MakeMailboxDto(c));
+
+		if (dirty) File.WriteAllText(OverridePath, root.ToJsonString(Pretty));
 	}
 
 	private JsonObject ReadOverride()

@@ -1,22 +1,44 @@
-onReady(() =>
+// ── Helpers ────────────────────────────────────────────────
+
+function $id(id) { return document.getElementById(id); }
+function $$(sel) { return Array.from(document.querySelectorAll(sel)); }
+
+function esc(str)
+{
+	return String(str ?? '').replace(/[&<>"']/g, c =>
+		({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+async function apiFetch(url, data)
+{
+	const opts = data
+		? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }
+		: { method: 'GET' };
+	const res = await fetch(url, opts);
+	if (!res.ok) throw new Error(`HTTP ${res.status}`);
+	if (res.status === 204) return null;
+	return res.json();
+}
+
+// ── Init ───────────────────────────────────────────────────
+
+document.addEventListener('DOMContentLoaded', () =>
 {
 	initTheme();
 
-	if (!$id('tab-smtp'))
-		return;
+	if (!$id('tab-smtp')) return;
 
 	initTabs();
 	refreshAll();
 	setInterval(refreshAll, 5000);
 });
 
-// ── Theme toggle ───────────────────────────────────────────
+// ── Theme ──────────────────────────────────────────────────
 
 function initTheme()
 {
 	const dark = localStorage.getItem('theme') === 'dark';
 	applyTheme(dark);
-
 	const btn = $id('theme-toggle');
 	if (btn) btn.addEventListener('click', () =>
 	{
@@ -33,31 +55,28 @@ function applyTheme(dark)
 	if (btn) btn.textContent = dark ? '☾' : '☀';
 }
 
-// ── Tab navigation ─────────────────────────────────────────
+// ── Tabs ───────────────────────────────────────────────────
 
 function initTabs()
 {
-	$$('.tab-btn').on('click', function ()
+	$$('.tab-btn').forEach(btn => btn.addEventListener('click', function ()
 	{
-		$$('.tab-btn').removeClass('active');
-		$$('.tab-panel').removeClass('active');
-		this.addClass('active');
-		$id(this.dataset.panel).addClass('active');
+		$$('.tab-btn').forEach(b => b.classList.remove('active'));
+		$$('.tab-panel').forEach(p => p.classList.remove('active'));
+		this.classList.add('active');
+		$id(this.dataset.panel).classList.add('active');
+		if (this.dataset.panel === 'panel-other') loadOtherSettings();
+	}));
 
-		if (this.dataset.panel === 'panel-other')
-			loadOtherSettings();
-	});
-
-	// Inline settings toggles per protocol
-	$$('.inline-settings__toggle').on('click', function ()
+	$$('.inline-settings__toggle').forEach(btn => btn.addEventListener('click', function ()
 	{
 		const body = $id(this.dataset.target);
 		const wrap = this.closest('.inline-settings');
 		const opening = !wrap.classList.contains('open');
 		wrap.classList.toggle('open');
-		if (opening && body && body.innerHTML.trim() === '')
+		if (opening && body && (body.innerHTML.trim() === '' || !_cfg))
 			loadInlineSettings(this.dataset.target);
-	});
+	}));
 }
 
 // ── Status refresh ─────────────────────────────────────────
@@ -72,7 +91,7 @@ async function refreshServices()
 {
 	try
 	{
-		const d = await netproxyasync('/api/status/all');
+		const d = await apiFetch('/api/status/all');
 		setSvcTab('tab-smtp', d.smtp);
 		setSvcTab('tab-imap', d.imap);
 		setSvcTab('tab-pop3', d.pop3);
@@ -86,7 +105,7 @@ async function refreshSmtp()
 {
 	try
 	{
-		const d = await netproxyasync('/api/status/smtp');
+		const d = await apiFetch('/api/status/smtp');
 		set('smtp-total-conn', d.connections.total);
 		set('smtp-active',     d.connections.active);
 		set('smtp-recv',       d.messages.received);
@@ -114,7 +133,7 @@ async function refreshImap()
 {
 	try
 	{
-		const d = await netproxyasync('/api/status/imap');
+		const d = await apiFetch('/api/status/imap');
 		set('imap-total-conn',     d.connections.total);
 		set('imap-active',         d.connections.active);
 		set('imap-fetched',        d.messages.fetched);
@@ -135,7 +154,7 @@ async function refreshPop3()
 {
 	try
 	{
-		const d = await netproxyasync('/api/status/pop3');
+		const d = await apiFetch('/api/status/pop3');
 		set('pop3-total-conn',    d.connections.total);
 		set('pop3-active',        d.connections.active);
 		set('pop3-retrieved',     d.messages.retrieved);
@@ -151,40 +170,39 @@ async function refreshPop3()
 	catch (e) { console.error('POP3 refresh failed', e); }
 }
 
-// ── Settings ───────────────────────────────────────────────
+// ── Settings load ──────────────────────────────────────────
 
 let _cfg = null;
 
 async function fetchConfig()
 {
-	if (!_cfg) _cfg = await netproxyasync('/api/config');
+	if (!_cfg) _cfg = await apiFetch('/api/config');
 	return _cfg;
 }
 
 function wireSettingsContainer(el)
 {
-	el.on('click', '.btn-add-port', function ()
+	el.addEventListener('click', function (e)
 	{
-		const tbody = $id(this.dataset.prefix + '-ports-tbody');
-		if (tbody) tbody.insertAdjacentHTML('beforeend', portRow({}));
-	});
-	el.on('click', '.btn-remove-port', function ()
-	{
-		this.closest('tr').remove();
-	});
-	el.on('click', '.btn-save', async function ()
-	{
-		const key = this.dataset.save;
-		const msg = $id('msg-' + key);
-		this.disabled = true;
-		try
+		if (e.target.classList.contains('btn-add-port'))
 		{
-			await saveConfig(key);
-			_cfg = null;
-			showMsg(msg, true, 'Saved');
+			const tbody = $id(e.target.dataset.prefix + '-ports-tbody');
+			if (tbody) tbody.insertAdjacentHTML('beforeend', portRow({}));
 		}
-		catch (e) { showMsg(msg, false, e.message || 'Error'); }
-		finally { this.disabled = false; }
+		if (e.target.classList.contains('btn-remove-port'))
+		{
+			e.target.closest('tr').remove();
+		}
+		if (e.target.classList.contains('btn-save'))
+		{
+			const key = e.target.dataset.save;
+			const msg = $id('msg-' + key);
+			e.target.disabled = true;
+			saveConfig(key)
+				.then(() => { _cfg = null; showMsg(msg, true, 'Saved'); })
+				.catch(err => showMsg(msg, false, err.message || 'Error'))
+				.finally(() => { e.target.disabled = false; });
+		}
 	});
 }
 
@@ -222,11 +240,11 @@ async function saveConfig(key)
 {
 	switch (key)
 	{
-		case 'smtp':    await netproxyasync('/api/config/smtp',    collectSmtp());    break;
-		case 'pop3':    await netproxyasync('/api/config/pop3',    collectPop3());    break;
-		case 'imap':    await netproxyasync('/api/config/imap',    collectImap());    break;
-		case 'dmarc':   await netproxyasync('/api/config/dmarc',   collectDmarc());   break;
-		case 'mailbox': await netproxyasync('/api/config/mailbox', collectMailbox()); break;
+		case 'smtp':    return apiFetch('/api/config/smtp',    collectSmtp());
+		case 'pop3':    return apiFetch('/api/config/pop3',    collectPop3());
+		case 'imap':    return apiFetch('/api/config/imap',    collectImap());
+		case 'dmarc':   return apiFetch('/api/config/dmarc',   collectDmarc());
+		case 'mailbox': return apiFetch('/api/config/mailbox', collectMailbox());
 	}
 }
 
@@ -250,27 +268,25 @@ function buildCfgSmtp(s)
 		${textarea('smtp-domains', 'Local domains (one per line)',  (s.localDomains  || []).join('\n'))}
 	</div>
 	<div class="toggle-list">
-		${toggle('smtp-auth',    'Enable AUTH',     'Allow SMTP authentication',      s.enableAuth)}
-		${toggle('smtp-vrfy',    'Enable VRFY',     'Allow address verification',      s.enableVrfy)}
-		${toggle('smtp-expn',    'Enable EXPN',     'Allow mailing list expansion',    s.enableExpn)}
-		${toggle('smtp-dkim',    'Require DKIM',    'Reject mail without valid DKIM',  s.requireDkim)}
+		${toggle('smtp-auth',     'Enable AUTH',     'Allow SMTP authentication',       s.enableAuth)}
+		${toggle('smtp-starttls', 'Enable STARTTLS', 'Advertise STARTTLS in EHLO',      s.enableStartTls)}
+		${toggle('smtp-vrfy',     'Enable VRFY',     'Allow address verification',       s.enableVrfy)}
+		${toggle('smtp-expn',     'Enable EXPN',     'Allow mailing list expansion',     s.enableExpn)}
+		${toggle('smtp-dkim',     'Require DKIM',    'Reject mail without valid DKIM',   s.requireDkim)}
 	</div>
-
-	<div class="cfg-section-title">Ports <span class="cfg-restart-note">⚠ restart required</span></div>
+	<div class="cfg-section-title">Ports <span class="cfg-restart-note">&#9888; restart required</span></div>
 	${buildPorts('smtp', s.ports)}
-
 	<div class="cfg-section-title">Relay</div>
 	<div class="form-grid">
-		${field('smtp-relayqueue',   'Relay queue path',     s.relayQueuePath)}
-		${field('smtp-relayuser',    'Relay username',       s.relayUsername)}
-		${field('smtp-relaypass',    'Relay password',       s.relayPassword,       'password')}
-		${field('smtp-relaytimeout', 'Relay timeout (sec)',  s.relayTimeoutSeconds, 'number')}
+		${field('smtp-relayqueue',   'Relay queue path',    s.relayQueuePath)}
+		${field('smtp-relayuser',    'Relay username',      s.relayUsername)}
+		${field('smtp-relaypass',    'Relay password',      s.relayPassword,       'password')}
+		${field('smtp-relaytimeout', 'Relay timeout (sec)', s.relayTimeoutSeconds, 'number')}
 	</div>
 	<div class="toggle-list">
-		${toggle('smtp-relaytls',  'Use TLS for relay',     'Encrypt outgoing relay connections', s.relayUseTls)}
-		${toggle('smtp-relayauth', 'Relay requires AUTH',   'Authenticate when relaying',         s.relayRequiresAuth)}
+		${toggle('smtp-relaytls',  'Use TLS for relay',   'Encrypt outgoing relay connections', s.relayUseTls)}
+		${toggle('smtp-relayauth', 'Relay requires AUTH', 'Authenticate when relaying',         s.relayRequiresAuth)}
 	</div>
-
 	<div class="cfg-footer">
 		<button class="btn-save" data-save="smtp">Save SMTP</button>
 		<span class="save-msg" id="msg-smtp"></span>
@@ -287,10 +303,8 @@ function buildCfgPop3(s)
 		${field('pop3-certpath', 'Certificate path',     s.certificatePath)}
 		${field('pop3-certpass', 'Certificate password', s.certificatePassword, 'password')}
 	</div>
-
-	<div class="cfg-section-title">Ports <span class="cfg-restart-note">⚠ restart required</span></div>
+	<div class="cfg-section-title">Ports <span class="cfg-restart-note">&#9888; restart required</span></div>
 	${buildPorts('pop3', s.ports)}
-
 	<div class="cfg-footer">
 		<button class="btn-save" data-save="pop3">Save POP3</button>
 		<span class="save-msg" id="msg-pop3"></span>
@@ -307,10 +321,8 @@ function buildCfgImap(s)
 		${field('imap-certpath', 'Certificate path',     s.certificatePath)}
 		${field('imap-certpass', 'Certificate password', s.certificatePassword, 'password')}
 	</div>
-
-	<div class="cfg-section-title">Ports <span class="cfg-restart-note">⚠ restart required</span></div>
+	<div class="cfg-section-title">Ports <span class="cfg-restart-note">&#9888; restart required</span></div>
 	${buildPorts('imap', s.ports)}
-
 	<div class="cfg-footer">
 		<button class="btn-save" data-save="imap">Save IMAP</button>
 		<span class="save-msg" id="msg-imap"></span>
@@ -324,14 +336,13 @@ function buildCfgOther(dmarc, mailbox)
 	return `
 	<div class="cfg-section-title">DMARC</div>
 	<div class="toggle-list">
-		${toggle('dmarc-failopen', 'Fail open',     'Accept mail when DMARC lookup fails',  dmarc.failOpen)}
-		${toggle('dmarc-require',  'Require DMARC', 'Reject mail that fails DMARC policy',  dmarc.requireDmarc)}
+		${toggle('dmarc-failopen', 'Fail open',     'Accept mail when DMARC lookup fails', dmarc.failOpen)}
+		${toggle('dmarc-require',  'Require DMARC', 'Reject mail that fails DMARC policy', dmarc.requireDmarc)}
 	</div>
 	<div class="cfg-footer">
 		<button class="btn-save" data-save="dmarc">Save DMARC</button>
 		<span class="save-msg" id="msg-dmarc"></span>
 	</div>
-
 	<div class="cfg-section-title" style="margin-top:28px">Mailbox</div>
 	<div class="form-grid">
 		${field('mailbox-path', 'Storage path', mailbox.storagePath)}
@@ -390,7 +401,7 @@ function collectSmtp()
 		commandTimeoutSeconds: int('smtp-timeout'),
 		backLog:               int('smtp-backlog'),
 		enableAuth:            chk('smtp-auth'),
-		enableStartTls:        false,
+		enableStartTls:        chk('smtp-starttls'),
 		enableVrfy:            chk('smtp-vrfy'),
 		enableExpn:            chk('smtp-expn'),
 		requireDkim:           chk('smtp-dkim'),
@@ -482,7 +493,7 @@ function showMsg(el, ok, text)
 	if (!el) return;
 	el.textContent = text;
 	el.className = 'save-msg ' + (ok ? 'show-ok' : 'show-err');
-	setTimeout(() => el.className = 'save-msg', 3000);
+	setTimeout(() => { el.className = 'save-msg'; }, 3000);
 }
 
 function val(id)   { const el = $id(id); return el ? el.value : ''; }
@@ -503,7 +514,7 @@ function setSvcTab(tabId, up)
 function set(id, value)
 {
 	const el = $id(id);
-	if (el) el.textContent = (value !== null && value !== undefined) ? value : '—';
+	if (el) el.textContent = (value != null) ? value : '—';
 }
 
 function setBar(id, n, total)
@@ -536,8 +547,8 @@ function pulse()
 function formatBytes(b)
 {
 	if (b == null) return '—';
-	if (b < 1024)     return b + ' B';
-	if (b < 1048576)  return (b / 1024).toFixed(1) + ' KB';
+	if (b < 1024)    return b + ' B';
+	if (b < 1048576) return (b / 1024).toFixed(1) + ' KB';
 	return (b / 1048576).toFixed(2) + ' MB';
 }
 
@@ -561,10 +572,4 @@ function timeSince(iso)
 function fmtDate(iso)
 {
 	return new Date(iso).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' });
-}
-
-function esc(str)
-{
-	return String(str ?? '').replace(/[&<>"']/g, c =>
-		({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }

@@ -1,1 +1,52 @@
-{}
+{
+  "SmtpSettings": {
+    "Ports": [
+      { "Host": "127.0.0.1", "Port": 25,  "Security": "None"    },
+      { "Host": "127.0.0.1", "Port": 587, "Security": "StartTls" },
+      { "Host": "127.0.0.1", "Port": 465, "Security": "Tls"      }
+    ],
+    "BackLog": 100,
+    "MaxMessageSize": 10485760,
+    "CommandTimeoutSeconds": 60,
+    "EmlStoragePath": "Emails",
+    "EnableVrfy": false,
+    "EnableExpn": false,
+    "EnableAuth": true,
+    "EnableStartTls": true,
+    "CertificatePath": "certificate.pfx",
+    "CertificatePassword": "yourpassword",
+    "UserStorePath": "users.json",
+    "RequireDkim": false,
+    "DnsResolvers": [ "8.8.8.8", "8.8.4.4" ],
+    "LocalDomains": [ "example.com", "mijndomein.nl" ],
+    "RelayQueuePath": "RelayQueue",
+    "RelayUseTls": true,
+    "RelayTimeoutSeconds": 30,
+    "RelayRequiresAuth": false,
+    "RelayUsername": "username",
+    "RelayPassword": "password"
+  },
+  "Pop3Settings": {
+    "Ports": [
+      { "Host": "127.0.0.1", "Port": 110, "Security": "None" },
+      { "Host": "127.0.0.1", "Port": 995, "Security": "Tls"  }
+    ],
+    "CertificatePath": "certificate.pfx",
+    "CertificatePassword": "yourpassword"
+  },
+  "ImapSettings": {
+    "Ports": [
+      { "Host": "127.0.0.1", "Port": 143, "Security": "StartTls" },
+      { "Host": "127.0.0.1", "Port": 993, "Security": "Tls"       }
+    ],
+    "CertificatePath": "certificate.pfx",
+    "CertificatePassword": "yourpassword"
+  },
+  "DmarcSettings": {
+    "FailOpen": true,
+    "RequireDmarc": false
+  },
+  "MailboxSettings": {
+    "StoragePath": "Mailboxes"
+  }
+}
