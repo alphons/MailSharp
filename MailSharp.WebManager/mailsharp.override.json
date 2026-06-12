@@ -19,6 +19,9 @@
     "RequireDkim": false,
     "DnsResolvers": [ "8.8.8.8", "8.8.4.4" ],
     "LocalDomains": [ "example.com", "mijndomein.nl" ],
+    "MaxConnections": 0,
+    "WelcomeMessage": "",
+    "RelayEnabled": false,
     "RelayQueuePath": "RelayQueue",
     "RelayUseTls": true,
     "RelayTimeoutSeconds": 30,
@@ -32,7 +35,9 @@
       { "Host": "127.0.0.1", "Port": 995, "Security": "Tls"  }
     ],
     "CertificatePath": "certificate.pfx",
-    "CertificatePassword": "yourpassword"
+    "CertificatePassword": "yourpassword",
+    "MaxConnections": 0,
+    "WelcomeMessage": ""
   },
   "ImapSettings": {
     "Ports": [
@@ -40,7 +45,15 @@
       { "Host": "127.0.0.1", "Port": 993, "Security": "Tls"       }
     ],
     "CertificatePath": "certificate.pfx",
-    "CertificatePassword": "yourpassword"
+    "CertificatePassword": "yourpassword",
+    "MaxConnections": 0,
+    "WelcomeMessage": "",
+    "PublicFolderName": "# Public",
+    "EnableSort": true,
+    "EnableQuota": true,
+    "EnableIdle": true,
+    "EnableAcl": true,
+    "HierarchyDelimiter": "."
   },
   "DmarcSettings": {
     "FailOpen": true,

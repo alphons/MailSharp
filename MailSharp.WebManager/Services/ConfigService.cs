@@ -42,6 +42,9 @@ public class ConfigService(IWebHostEnvironment env)
 		UserStorePath         = c["SmtpSettings:UserStorePath"] ?? string.Empty,
 		DnsResolvers          = c.GetSection("SmtpSettings:DnsResolvers").Get<List<string>>() ?? [],
 		LocalDomains          = c.GetSection("SmtpSettings:LocalDomains").Get<List<string>>() ?? [],
+		MaxConnections        = c.GetValue<int>("SmtpSettings:MaxConnections"),
+		WelcomeMessage        = c["SmtpSettings:WelcomeMessage"] ?? string.Empty,
+		RelayEnabled          = c.GetValue<bool>("SmtpSettings:RelayEnabled"),
 		RelayQueuePath        = c["SmtpSettings:RelayQueuePath"] ?? string.Empty,
 		RelayUseTls           = c.GetValue<bool>("SmtpSettings:RelayUseTls"),
 		RelayTimeoutSeconds   = c.GetValue<int>("SmtpSettings:RelayTimeoutSeconds"),
@@ -55,14 +58,24 @@ public class ConfigService(IWebHostEnvironment env)
 	{
 		CertificatePath     = c["Pop3Settings:CertificatePath"] ?? string.Empty,
 		CertificatePassword = c["Pop3Settings:CertificatePassword"] ?? string.Empty,
-		Ports               = c.GetSection("Pop3Settings:Ports").Get<List<PortConfigDto>>() ?? []
+		Ports               = c.GetSection("Pop3Settings:Ports").Get<List<PortConfigDto>>() ?? [],
+		MaxConnections      = c.GetValue<int>("Pop3Settings:MaxConnections"),
+		WelcomeMessage      = c["Pop3Settings:WelcomeMessage"] ?? string.Empty
 	};
 
 	private static ImapConfigDto MakeImapDto(IConfiguration c) => new()
 	{
-		CertificatePath     = c["ImapSettings:CertificatePath"] ?? string.Empty,
-		CertificatePassword = c["ImapSettings:CertificatePassword"] ?? string.Empty,
-		Ports               = c.GetSection("ImapSettings:Ports").Get<List<PortConfigDto>>() ?? []
+		CertificatePath      = c["ImapSettings:CertificatePath"] ?? string.Empty,
+		CertificatePassword  = c["ImapSettings:CertificatePassword"] ?? string.Empty,
+		Ports                = c.GetSection("ImapSettings:Ports").Get<List<PortConfigDto>>() ?? [],
+		MaxConnections       = c.GetValue<int>("ImapSettings:MaxConnections"),
+		WelcomeMessage       = c["ImapSettings:WelcomeMessage"] ?? string.Empty,
+		PublicFolderName     = c["ImapSettings:PublicFolderName"] ?? "# Public",
+		EnableSort           = c.GetValue<bool>("ImapSettings:EnableSort"),
+		EnableQuota          = c.GetValue<bool>("ImapSettings:EnableQuota"),
+		EnableIdle           = c.GetValue<bool>("ImapSettings:EnableIdle"),
+		EnableAcl            = c.GetValue<bool>("ImapSettings:EnableAcl"),
+		HierarchyDelimiter   = c["ImapSettings:HierarchyDelimiter"] ?? "."
 	};
 
 	private static DmarcConfigDto MakeDmarcDto(IConfiguration c) => new()
@@ -161,6 +174,9 @@ public class SmtpConfigDto
 	public string       UserStorePath         { get; set; } = string.Empty;
 	public List<string> DnsResolvers          { get; set; } = [];
 	public List<string> LocalDomains          { get; set; } = [];
+	public int          MaxConnections        { get; set; }
+	public string       WelcomeMessage        { get; set; } = string.Empty;
+	public bool         RelayEnabled          { get; set; }
 	public string       RelayQueuePath        { get; set; } = string.Empty;
 	public bool         RelayUseTls           { get; set; }
 	public int          RelayTimeoutSeconds   { get; set; }
@@ -175,6 +191,8 @@ public class Pop3ConfigDto
 	public string CertificatePath     { get; set; } = string.Empty;
 	public string CertificatePassword { get; set; } = string.Empty;
 	public List<PortConfigDto> Ports  { get; set; } = [];
+	public int    MaxConnections      { get; set; }
+	public string WelcomeMessage      { get; set; } = string.Empty;
 }
 
 public class ImapConfigDto
@@ -182,6 +200,14 @@ public class ImapConfigDto
 	public string CertificatePath     { get; set; } = string.Empty;
 	public string CertificatePassword { get; set; } = string.Empty;
 	public List<PortConfigDto> Ports  { get; set; } = [];
+	public int    MaxConnections      { get; set; }
+	public string WelcomeMessage      { get; set; } = string.Empty;
+	public string PublicFolderName    { get; set; } = "# Public";
+	public bool   EnableSort          { get; set; }
+	public bool   EnableQuota         { get; set; }
+	public bool   EnableIdle          { get; set; }
+	public bool   EnableAcl           { get; set; }
+	public string HierarchyDelimiter  { get; set; } = ".";
 }
 
 public class DmarcConfigDto

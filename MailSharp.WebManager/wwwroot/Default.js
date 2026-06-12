@@ -65,7 +65,6 @@ function initTabs()
 		$$('.tab-panel').forEach(p => p.classList.remove('active'));
 		this.classList.add('active');
 		$id(this.dataset.panel).classList.add('active');
-		if (this.dataset.panel === 'panel-other') loadOtherSettings();
 	}));
 
 	$$('.inline-settings__toggle').forEach(btn => btn.addEventListener('click', function ()
@@ -214,23 +213,9 @@ async function loadInlineSettings(bodyId)
 	try
 	{
 		const cfg = await fetchConfig();
-		if      (bodyId === 'cfg-smtp-body') el.innerHTML = buildCfgSmtp(cfg.smtp);
+		if      (bodyId === 'cfg-smtp-body') el.innerHTML = buildCfgSmtp(cfg.smtp, cfg.dmarc, cfg.mailbox);
 		else if (bodyId === 'cfg-imap-body') el.innerHTML = buildCfgImap(cfg.imap);
 		else if (bodyId === 'cfg-pop3-body') el.innerHTML = buildCfgPop3(cfg.pop3);
-		wireSettingsContainer(el);
-	}
-	catch (e) { el.innerHTML = `<p style="color:var(--red)">${esc(e.message)}</p>`; }
-}
-
-async function loadOtherSettings()
-{
-	const el = $id('cfg-other-form');
-	if (!el || el.dataset.loaded) return;
-	try
-	{
-		const cfg = await fetchConfig();
-		el.innerHTML = buildCfgOther(cfg.dmarc, cfg.mailbox);
-		el.dataset.loaded = '1';
 		wireSettingsContainer(el);
 	}
 	catch (e) { el.innerHTML = `<p style="color:var(--red)">${esc(e.message)}</p>`; }
@@ -250,7 +235,7 @@ async function saveConfig(key)
 
 // ── SMTP panel ─────────────────────────────────────────────
 
-function buildCfgSmtp(s)
+function buildCfgSmtp(s, dmarc, mailbox)
 {
 	return `
 	<div class="cfg-section-title">General</div>
@@ -267,6 +252,16 @@ function buildCfgSmtp(s)
 		${textarea('smtp-dns',     'DNS Resolvers (one per line)',  (s.dnsResolvers || []).join('\n'))}
 		${textarea('smtp-domains', 'Local domains (one per line)',  (s.localDomains  || []).join('\n'))}
 	</div>
+	<div class="cfg-section-title">Connections</div>
+	<div class="form-grid">
+		${field('smtp-maxconn', 'Maximum simultaneous connections (0 for unlimited)', s.maxConnections, 'number')}
+	</div>
+
+	<div class="cfg-section-title">Other</div>
+	<div class="form-grid">
+		${field('smtp-welcome', 'Welcome message', s.welcomeMessage)}
+	</div>
+
 	<div class="toggle-list">
 		${toggle('smtp-auth',     'Enable AUTH',     'Allow SMTP authentication',       s.enableAuth)}
 		${toggle('smtp-starttls', 'Enable STARTTLS', 'Advertise STARTTLS in EHLO',      s.enableStartTls)}
@@ -277,6 +272,9 @@ function buildCfgSmtp(s)
 	<div class="cfg-section-title">Ports <span class="cfg-restart-note">&#9888; restart required</span></div>
 	${buildPorts('smtp', s.ports)}
 	<div class="cfg-section-title">Relay</div>
+	<div class="toggle-list">
+		${toggle('smtp-relay', 'Enable relay', 'Forward outgoing mail to an external server', s.relayEnabled)}
+	</div>
 	<div class="form-grid">
 		${field('smtp-relayqueue',   'Relay queue path',    s.relayQueuePath)}
 		${field('smtp-relayuser',    'Relay username',      s.relayUsername)}
@@ -290,51 +288,8 @@ function buildCfgSmtp(s)
 	<div class="cfg-footer">
 		<button class="btn-save" data-save="smtp">Save SMTP</button>
 		<span class="save-msg" id="msg-smtp"></span>
-	</div>`;
-}
-
-// ── POP3 panel ─────────────────────────────────────────────
-
-function buildCfgPop3(s)
-{
-	return `
-	<div class="cfg-section-title">General</div>
-	<div class="form-grid">
-		${field('pop3-certpath', 'Certificate path',     s.certificatePath)}
-		${field('pop3-certpass', 'Certificate password', s.certificatePassword, 'password')}
 	</div>
-	<div class="cfg-section-title">Ports <span class="cfg-restart-note">&#9888; restart required</span></div>
-	${buildPorts('pop3', s.ports)}
-	<div class="cfg-footer">
-		<button class="btn-save" data-save="pop3">Save POP3</button>
-		<span class="save-msg" id="msg-pop3"></span>
-	</div>`;
-}
-
-// ── IMAP panel ─────────────────────────────────────────────
-
-function buildCfgImap(s)
-{
-	return `
-	<div class="cfg-section-title">General</div>
-	<div class="form-grid">
-		${field('imap-certpath', 'Certificate path',     s.certificatePath)}
-		${field('imap-certpass', 'Certificate password', s.certificatePassword, 'password')}
-	</div>
-	<div class="cfg-section-title">Ports <span class="cfg-restart-note">&#9888; restart required</span></div>
-	${buildPorts('imap', s.ports)}
-	<div class="cfg-footer">
-		<button class="btn-save" data-save="imap">Save IMAP</button>
-		<span class="save-msg" id="msg-imap"></span>
-	</div>`;
-}
-
-// ── Other panel ────────────────────────────────────────────
-
-function buildCfgOther(dmarc, mailbox)
-{
-	return `
-	<div class="cfg-section-title">DMARC</div>
+	<div class="cfg-section-title" style="margin-top:28px">DMARC</div>
 	<div class="toggle-list">
 		${toggle('dmarc-failopen', 'Fail open',     'Accept mail when DMARC lookup fails', dmarc.failOpen)}
 		${toggle('dmarc-require',  'Require DMARC', 'Reject mail that fails DMARC policy', dmarc.requireDmarc)}
@@ -350,6 +305,85 @@ function buildCfgOther(dmarc, mailbox)
 	<div class="cfg-footer">
 		<button class="btn-save" data-save="mailbox">Save Mailbox</button>
 		<span class="save-msg" id="msg-mailbox"></span>
+	</div>`;
+}
+
+// ── POP3 panel ─────────────────────────────────────────────
+
+function buildCfgPop3(s)
+{
+	return `
+	<div class="cfg-section-title">General</div>
+	<div class="form-grid">
+		${field('pop3-certpath', 'Certificate path',     s.certificatePath)}
+		${field('pop3-certpass', 'Certificate password', s.certificatePassword, 'password')}
+	</div>
+
+	<div class="cfg-section-title">Connections</div>
+	<div class="form-grid">
+		${field('pop3-maxconn', 'Maximum simultaneous connections (0 for unlimited)', s.maxConnections, 'number')}
+	</div>
+
+	<div class="cfg-section-title">Other</div>
+	<div class="form-grid">
+		${field('pop3-welcome', 'Welcome message', s.welcomeMessage)}
+	</div>
+
+	<div class="cfg-section-title">Ports <span class="cfg-restart-note">&#9888; restart required</span></div>
+	${buildPorts('pop3', s.ports)}
+	<div class="cfg-footer">
+		<button class="btn-save" data-save="pop3">Save POP3</button>
+		<span class="save-msg" id="msg-pop3"></span>
+	</div>`;
+}
+
+// ── IMAP panel ─────────────────────────────────────────────
+
+function buildCfgImap(s)
+{
+	const delimOpts = ['.', '/', '\\'].map(d =>
+		`<option value="${d}"${s.hierarchyDelimiter === d ? ' selected' : ''}>${d}</option>`
+	).join('');
+
+	return `
+	<div class="cfg-section-title">General</div>
+	<div class="form-grid">
+		${field('imap-certpath', 'Certificate path',     s.certificatePath)}
+		${field('imap-certpass', 'Certificate password', s.certificatePassword, 'password')}
+	</div>
+
+	<div class="cfg-section-title">Connections</div>
+	<div class="form-grid">
+		${field('imap-maxconn', 'Maximum simultaneous connections (0 for unlimited)', s.maxConnections, 'number')}
+	</div>
+
+	<div class="cfg-section-title">Public Folders</div>
+	<div class="form-grid">
+		${field('imap-publicfolder', 'Public folder name', s.publicFolderName)}
+	</div>
+
+	<div class="cfg-section-title">Advanced</div>
+	<div class="toggle-list">
+		${toggle('imap-sort',  'IMAP Sort',  'Enable SORT extension',  s.enableSort)}
+		${toggle('imap-quota', 'IMAP Quota', 'Enable QUOTA extension', s.enableQuota)}
+		${toggle('imap-idle',  'IMAP IDLE',  'Enable IDLE extension',  s.enableIdle)}
+		${toggle('imap-acl',   'IMAP ACL',   'Enable ACL extension',   s.enableAcl)}
+	</div>
+
+	<div class="cfg-section-title">Other</div>
+	<div class="form-grid">
+		${field('imap-welcome', 'Welcome message', s.welcomeMessage)}
+	</div>
+	<div class="form-field">
+		<label for="imap-delim">Hierarchy delimiter</label>
+		<select id="imap-delim">${delimOpts}</select>
+	</div>
+
+	<div class="cfg-section-title">Ports <span class="cfg-restart-note">&#9888; restart required</span></div>
+	${buildPorts('imap', s.ports)}
+	<div class="cfg-footer">
+		<button class="btn-save" data-save="imap">Save IMAP</button>
+		<span class="save-msg" id="msg-imap"></span>
 	</div>`;
 }
 
@@ -407,6 +441,9 @@ function collectSmtp()
 		requireDkim:           chk('smtp-dkim'),
 		dnsResolvers:          lines('smtp-dns'),
 		localDomains:          lines('smtp-domains'),
+		maxConnections:        int('smtp-maxconn'),
+		welcomeMessage:        val('smtp-welcome'),
+		relayEnabled:          chk('smtp-relay'),
 		relayQueuePath:        val('smtp-relayqueue'),
 		relayUseTls:           chk('smtp-relaytls'),
 		relayTimeoutSeconds:   int('smtp-relaytimeout'),
@@ -422,7 +459,9 @@ function collectPop3()
 	return {
 		certificatePath:     val('pop3-certpath'),
 		certificatePassword: val('pop3-certpass'),
-		ports:               collectPorts('pop3')
+		ports:               collectPorts('pop3'),
+		maxConnections:      int('pop3-maxconn'),
+		welcomeMessage:      val('pop3-welcome')
 	};
 }
 
@@ -431,7 +470,15 @@ function collectImap()
 	return {
 		certificatePath:     val('imap-certpath'),
 		certificatePassword: val('imap-certpass'),
-		ports:               collectPorts('imap')
+		ports:               collectPorts('imap'),
+		maxConnections:      int('imap-maxconn'),
+		welcomeMessage:      val('imap-welcome'),
+		publicFolderName:    val('imap-publicfolder'),
+		enableSort:          chk('imap-sort'),
+		enableQuota:         chk('imap-quota'),
+		enableIdle:          chk('imap-idle'),
+		enableAcl:           chk('imap-acl'),
+		hierarchyDelimiter:  val('imap-delim')
 	};
 }
 
