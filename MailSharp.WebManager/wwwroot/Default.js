@@ -1,5 +1,7 @@
 onReady(() =>
 {
+	initTheme();
+
 	if (!$id('tab-smtp'))
 		return;
 
@@ -7,6 +9,29 @@ onReady(() =>
 	refreshAll();
 	setInterval(refreshAll, 5000);
 });
+
+// ── Theme toggle ───────────────────────────────────────────
+
+function initTheme()
+{
+	const dark = localStorage.getItem('theme') === 'dark';
+	applyTheme(dark);
+
+	const btn = $id('theme-toggle');
+	if (btn) btn.addEventListener('click', () =>
+	{
+		const isDark = document.body.classList.toggle('dark');
+		localStorage.setItem('theme', isDark ? 'dark' : 'light');
+		btn.textContent = isDark ? '☾' : '☀';
+	});
+}
+
+function applyTheme(dark)
+{
+	document.body.classList.toggle('dark', dark);
+	const btn = $id('theme-toggle');
+	if (btn) btn.textContent = dark ? '☾' : '☀';
+}
 
 // ── Tab navigation ─────────────────────────────────────────
 

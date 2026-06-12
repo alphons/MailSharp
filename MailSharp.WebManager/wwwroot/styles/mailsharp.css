@@ -6,7 +6,34 @@
 	padding: 0;
 }
 
+/* ── Light mode (default) ────────────────────────────────── */
 :root {
+	--bg:           #f3f4f8;
+	--surface:      #ffffff;
+	--surface-2:    #f0f1f5;
+	--border:       #dde0ea;
+	--text:         #1a1d2e;
+	--text-muted:   #7a7f9a;
+	--text-dim:     #b0b4c8;
+	--accent:       #3a7ef5;
+	--accent-glow:  rgba(58,126,245,.14);
+	--green:        #18a658;
+	--green-bg:     rgba(24,166,88,.10);
+	--red:          #e03e3b;
+	--red-bg:       rgba(224,62,59,.10);
+	--amber:        #d4820a;
+	--amber-bg:     rgba(212,130,10,.10);
+	--purple:       #7c5ce0;
+	--purple-bg:    rgba(124,92,224,.10);
+	--radius:       10px;
+	--radius-sm:    6px;
+	--font:         'Segoe UI', system-ui, -apple-system, sans-serif;
+	--mono:         'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+	--transition:   .2s ease;
+}
+
+/* ── Dark mode ───────────────────────────────────────────── */
+body.dark {
 	--bg:           #0d0f17;
 	--surface:      #13161f;
 	--surface-2:    #1a1e2e;
@@ -24,11 +51,6 @@
 	--amber-bg:     rgba(240,160,80,.12);
 	--purple:       #9b7cf0;
 	--purple-bg:    rgba(155,124,240,.12);
-	--radius:       10px;
-	--radius-sm:    6px;
-	--font:         'Segoe UI', system-ui, -apple-system, sans-serif;
-	--mono:         'Cascadia Code', 'Fira Code', 'Consolas', monospace;
-	--transition:   .2s ease;
 }
 
 html { font-size: 16px; }
@@ -88,7 +110,7 @@ a:hover { text-decoration: underline; }
 .app-header__title {
 	font-size: .95rem;
 	font-weight: 700;
-	color: #fff;
+	color: var(--text);
 	white-space: nowrap;
 }
 
@@ -115,6 +137,23 @@ a:hover { text-decoration: underline; }
 	font-size: .8rem;
 }
 .app-header__logout:hover { color: var(--red); text-decoration: none; }
+
+.theme-toggle {
+	width: 32px;
+	height: 32px;
+	border-radius: 50%;
+	border: 1px solid var(--border);
+	background: var(--surface-2);
+	color: var(--text-muted);
+	font-size: .9rem;
+	cursor: pointer;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	transition: background var(--transition), color var(--transition), border-color var(--transition);
+	flex-shrink: 0;
+}
+.theme-toggle:hover { background: var(--border); color: var(--text); }
 
 .app-main {
 	padding: 28px 24px 48px;
