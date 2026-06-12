@@ -237,21 +237,25 @@ async function saveConfig(key)
 
 function buildCfgSmtp(s, dmarc, mailbox)
 {
+	const secOpts = ['None', 'StartTls', 'Tls'].map(v =>
+		`<option value="${v}"${s.relayConnectionSecurity === v ? ' selected' : ''}>${v}</option>`
+	).join('');
+
 	return `
 	<div class="cfg-section-title">General</div>
 	<div class="form-grid">
-		${field('smtp-emlpath',  'Email storage path',      s.emlStoragePath)}
-		${field('smtp-userstore','User store path',          s.userStorePath)}
-		${field('smtp-certpath', 'Certificate path',         s.certificatePath)}
-		${field('smtp-certpass', 'Certificate password',     s.certificatePassword, 'password')}
-		${field('smtp-maxmsg',   'Max message size (bytes)', s.maxMessageSize,       'number')}
-		${field('smtp-timeout',  'Command timeout (sec)',    s.commandTimeoutSeconds,'number')}
-		${field('smtp-backlog',  'Backlog',                  s.backLog,              'number')}
+		${field('smtp-emlpath',  'Email storage path',   s.emlStoragePath)}
+		${field('smtp-userstore','User store path',       s.userStorePath)}
+		${field('smtp-certpath', 'Certificate path',      s.certificatePath)}
+		${field('smtp-certpass', 'Certificate password',  s.certificatePassword, 'password')}
+		${field('smtp-timeout',  'Command timeout (sec)', s.commandTimeoutSeconds, 'number')}
+		${field('smtp-backlog',  'Backlog',                s.backLog, 'number')}
 	</div>
 	<div class="form-grid">
-		${textarea('smtp-dns',     'DNS Resolvers (one per line)',  (s.dnsResolvers || []).join('\n'))}
-		${textarea('smtp-domains', 'Local domains (one per line)',  (s.localDomains  || []).join('\n'))}
+		${textarea('smtp-dns',     'DNS Resolvers (one per line)', (s.dnsResolvers || []).join('\n'))}
+		${textarea('smtp-domains', 'Local domains (one per line)', (s.localDomains  || []).join('\n'))}
 	</div>
+
 	<div class="cfg-section-title">Connections</div>
 	<div class="form-grid">
 		${field('smtp-maxconn', 'Maximum simultaneous connections (0 for unlimited)', s.maxConnections, 'number')}
@@ -259,36 +263,77 @@ function buildCfgSmtp(s, dmarc, mailbox)
 
 	<div class="cfg-section-title">Other</div>
 	<div class="form-grid">
-		${field('smtp-welcome', 'Welcome message', s.welcomeMessage)}
+		${field('smtp-welcome', 'Welcome message',       s.welcomeMessage)}
+		${field('smtp-maxmsg',  'Max message size (KB)', s.maxMessageSizeKb, 'number')}
 	</div>
 
-	<div class="toggle-list">
-		${toggle('smtp-auth',     'Enable AUTH',     'Allow SMTP authentication',       s.enableAuth)}
-		${toggle('smtp-starttls', 'Enable STARTTLS', 'Advertise STARTTLS in EHLO',      s.enableStartTls)}
-		${toggle('smtp-vrfy',     'Enable VRFY',     'Allow address verification',       s.enableVrfy)}
-		${toggle('smtp-expn',     'Enable EXPN',     'Allow mailing list expansion',     s.enableExpn)}
-		${toggle('smtp-dkim',     'Require DKIM',    'Reject mail without valid DKIM',   s.requireDkim)}
+	<div class="cfg-section-title">Delivery of e-mail</div>
+	<div class="form-grid">
+		${field('smtp-retries',       'Number of retries',           s.retryCount,           'number')}
+		${field('smtp-retryinterval', 'Minutes between every retry', s.retryIntervalMinutes, 'number')}
+		${field('smtp-localhost',     'Local host name',             s.localHostName)}
 	</div>
-	<div class="cfg-section-title">Ports <span class="cfg-restart-note">&#9888; restart required</span></div>
-	${buildPorts('smtp', s.ports)}
-	<div class="cfg-section-title">Relay</div>
+
+	<div class="cfg-section-title">SMTP Relayer</div>
 	<div class="toggle-list">
-		${toggle('smtp-relay', 'Enable relay', 'Forward outgoing mail to an external server', s.relayEnabled)}
+		${toggle('smtp-relay', 'Enable relay', 'Forward outgoing mail to an external SMTP server', s.relayEnabled)}
 	</div>
 	<div class="form-grid">
-		${field('smtp-relayqueue',   'Relay queue path',    s.relayQueuePath)}
-		${field('smtp-relayuser',    'Relay username',      s.relayUsername)}
-		${field('smtp-relaypass',    'Relay password',      s.relayPassword,       'password')}
-		${field('smtp-relaytimeout', 'Relay timeout (sec)', s.relayTimeoutSeconds, 'number')}
+		${field('smtp-relayhost',  'Remote host name',   s.relayHost)}
+		${field('smtp-relayport',  'Remote TCP/IP port', s.relayPort, 'number')}
+		${field('smtp-relayqueue', 'Relay queue path',   s.relayQueuePath)}
 	</div>
 	<div class="toggle-list">
-		${toggle('smtp-relaytls',  'Use TLS for relay',   'Encrypt outgoing relay connections', s.relayUseTls)}
-		${toggle('smtp-relayauth', 'Relay requires AUTH', 'Authenticate when relaying',         s.relayRequiresAuth)}
+		${toggle('smtp-relayauth', 'Server requires authentication', 'Authenticate when relaying', s.relayRequiresAuth)}
 	</div>
+	<div class="form-grid">
+		${field('smtp-relayuser', 'User name', s.relayUsername)}
+		${field('smtp-relaypass', 'Password',  s.relayPassword, 'password')}
+	</div>
+	<div class="form-field">
+		<label for="smtp-relaysec">Connection security</label>
+		<select id="smtp-relaysec">${secOpts}</select>
+	</div>
+
+	<div class="cfg-section-title">RFC compliance</div>
+	<div class="toggle-list">
+		${toggle('smtp-plainauth',   'Allow plain text authentication',           'Allow AUTH PLAIN and AUTH LOGIN',           s.allowPlainTextAuth)}
+		${toggle('smtp-emptysender', 'Allow empty sender address',                'Accept MAIL FROM:<>',                       s.allowEmptySender)}
+		${toggle('smtp-badlineends', 'Allow incorrectly formatted line endings',  'Accept bare CR or LF in message data',      s.allowBadLineEndings)}
+		${toggle('smtp-discbadcmds', 'Disconnect after too many invalid commands','Close connection on repeated bad commands',  s.disconnectOnTooManyInvalidCommands)}
+	</div>
+	<div class="form-grid">
+		${field('smtp-maxbadcmds', 'Maximum number of invalid commands', s.maxInvalidCommands, 'number')}
+	</div>
+
+	<div class="cfg-section-title">Advanced</div>
+	<div class="form-grid">
+		${field('smtp-bindip',        'Bind to local IP address',          s.bindToLocalIp)}
+		${field('smtp-maxrecipients', 'Maximum recipients in batch',       s.maxRecipientsPerBatch, 'number')}
+		${field('smtp-ruleloop',      'Rule loop limit',                   s.ruleLoopLimit,         'number')}
+		${field('smtp-maxrechosts',   'Maximum number of recipient hosts', s.maxRecipientHosts,     'number')}
+	</div>
+	<div class="toggle-list">
+		${toggle('smtp-deliveredto', 'Add Delivered-To header', 'Insert Delivered-To header in relayed messages', s.addDeliveredToHeader)}
+	</div>
+
+	<div class="cfg-section-title">Auth / DKIM</div>
+	<div class="toggle-list">
+		${toggle('smtp-auth',     'Enable AUTH',     'Allow SMTP authentication',     s.enableAuth)}
+		${toggle('smtp-starttls', 'Enable STARTTLS', 'Advertise STARTTLS in EHLO',    s.enableStartTls)}
+		${toggle('smtp-vrfy',     'Enable VRFY',     'Allow address verification',     s.enableVrfy)}
+		${toggle('smtp-expn',     'Enable EXPN',     'Allow mailing list expansion',   s.enableExpn)}
+		${toggle('smtp-dkim',     'Require DKIM',    'Reject mail without valid DKIM', s.requireDkim)}
+	</div>
+
+	<div class="cfg-section-title">Ports <span class="cfg-restart-note">&#9888; restart required</span></div>
+	${buildPorts('smtp', s.ports)}
+
 	<div class="cfg-footer">
 		<button class="btn-save" data-save="smtp">Save SMTP</button>
 		<span class="save-msg" id="msg-smtp"></span>
 	</div>
+
 	<div class="cfg-section-title" style="margin-top:28px">DMARC</div>
 	<div class="toggle-list">
 		${toggle('dmarc-failopen', 'Fail open',     'Accept mail when DMARC lookup fails', dmarc.failOpen)}
@@ -298,6 +343,7 @@ function buildCfgSmtp(s, dmarc, mailbox)
 		<button class="btn-save" data-save="dmarc">Save DMARC</button>
 		<span class="save-msg" id="msg-dmarc"></span>
 	</div>
+
 	<div class="cfg-section-title" style="margin-top:28px">Mailbox</div>
 	<div class="form-grid">
 		${field('mailbox-path', 'Storage path', mailbox.storagePath)}
@@ -431,25 +477,39 @@ function collectSmtp()
 		userStorePath:         val('smtp-userstore'),
 		certificatePath:       val('smtp-certpath'),
 		certificatePassword:   val('smtp-certpass'),
-		maxMessageSize:        int('smtp-maxmsg'),
 		commandTimeoutSeconds: int('smtp-timeout'),
 		backLog:               int('smtp-backlog'),
+		dnsResolvers:          lines('smtp-dns'),
+		localDomains:          lines('smtp-domains'),
+		maxConnections:        int('smtp-maxconn'),
+		welcomeMessage:        val('smtp-welcome'),
+		maxMessageSizeKb:      int('smtp-maxmsg'),
+		retryCount:            int('smtp-retries'),
+		retryIntervalMinutes:  int('smtp-retryinterval'),
+		localHostName:         val('smtp-localhost'),
+		relayEnabled:          chk('smtp-relay'),
+		relayHost:             val('smtp-relayhost'),
+		relayPort:             int('smtp-relayport'),
+		relayQueuePath:        val('smtp-relayqueue'),
+		relayRequiresAuth:     chk('smtp-relayauth'),
+		relayUsername:         val('smtp-relayuser'),
+		relayPassword:         val('smtp-relaypass'),
+		relayConnectionSecurity: val('smtp-relaysec'),
+		allowPlainTextAuth:    chk('smtp-plainauth'),
+		allowEmptySender:      chk('smtp-emptysender'),
+		allowBadLineEndings:   chk('smtp-badlineends'),
+		disconnectOnTooManyInvalidCommands: chk('smtp-discbadcmds'),
+		maxInvalidCommands:    int('smtp-maxbadcmds'),
+		bindToLocalIp:         val('smtp-bindip'),
+		maxRecipientsPerBatch: int('smtp-maxrecipients'),
+		addDeliveredToHeader:  chk('smtp-deliveredto'),
+		ruleLoopLimit:         int('smtp-ruleloop'),
+		maxRecipientHosts:     int('smtp-maxrechosts'),
 		enableAuth:            chk('smtp-auth'),
 		enableStartTls:        chk('smtp-starttls'),
 		enableVrfy:            chk('smtp-vrfy'),
 		enableExpn:            chk('smtp-expn'),
 		requireDkim:           chk('smtp-dkim'),
-		dnsResolvers:          lines('smtp-dns'),
-		localDomains:          lines('smtp-domains'),
-		maxConnections:        int('smtp-maxconn'),
-		welcomeMessage:        val('smtp-welcome'),
-		relayEnabled:          chk('smtp-relay'),
-		relayQueuePath:        val('smtp-relayqueue'),
-		relayUseTls:           chk('smtp-relaytls'),
-		relayTimeoutSeconds:   int('smtp-relaytimeout'),
-		relayRequiresAuth:     chk('smtp-relayauth'),
-		relayUsername:         val('smtp-relayuser'),
-		relayPassword:         val('smtp-relaypass'),
 		ports:                 collectPorts('smtp')
 	};
 }

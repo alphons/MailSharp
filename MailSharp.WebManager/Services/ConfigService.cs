@@ -29,7 +29,6 @@ public class ConfigService(IWebHostEnvironment env)
 	private static SmtpConfigDto MakeSmtpDto(IConfiguration c) => new()
 	{
 		EmlStoragePath        = c["SmtpSettings:EmlStoragePath"] ?? string.Empty,
-		MaxMessageSize        = c.GetValue<int>("SmtpSettings:MaxMessageSize"),
 		CommandTimeoutSeconds = c.GetValue<int>("SmtpSettings:CommandTimeoutSeconds"),
 		BackLog               = c.GetValue<int>("SmtpSettings:BackLog"),
 		EnableAuth            = c.GetValue<bool>("SmtpSettings:EnableAuth"),
@@ -44,13 +43,28 @@ public class ConfigService(IWebHostEnvironment env)
 		LocalDomains          = c.GetSection("SmtpSettings:LocalDomains").Get<List<string>>() ?? [],
 		MaxConnections        = c.GetValue<int>("SmtpSettings:MaxConnections"),
 		WelcomeMessage        = c["SmtpSettings:WelcomeMessage"] ?? string.Empty,
+		MaxMessageSizeKb      = c.GetValue<int>("SmtpSettings:MaxMessageSizeKb"),
+		RetryCount            = c.GetValue<int>("SmtpSettings:RetryCount"),
+		RetryIntervalMinutes  = c.GetValue<int>("SmtpSettings:RetryIntervalMinutes"),
+		LocalHostName         = c["SmtpSettings:LocalHostName"] ?? string.Empty,
 		RelayEnabled          = c.GetValue<bool>("SmtpSettings:RelayEnabled"),
-		RelayQueuePath        = c["SmtpSettings:RelayQueuePath"] ?? string.Empty,
-		RelayUseTls           = c.GetValue<bool>("SmtpSettings:RelayUseTls"),
-		RelayTimeoutSeconds   = c.GetValue<int>("SmtpSettings:RelayTimeoutSeconds"),
+		RelayHost             = c["SmtpSettings:RelayHost"] ?? string.Empty,
+		RelayPort             = c.GetValue<int>("SmtpSettings:RelayPort"),
 		RelayRequiresAuth     = c.GetValue<bool>("SmtpSettings:RelayRequiresAuth"),
 		RelayUsername         = c["SmtpSettings:RelayUsername"] ?? string.Empty,
 		RelayPassword         = c["SmtpSettings:RelayPassword"] ?? string.Empty,
+		RelayConnectionSecurity = c["SmtpSettings:RelayConnectionSecurity"] ?? "None",
+		AllowPlainTextAuth    = c.GetValue<bool>("SmtpSettings:AllowPlainTextAuth"),
+		AllowEmptySender      = c.GetValue<bool>("SmtpSettings:AllowEmptySender"),
+		AllowBadLineEndings   = c.GetValue<bool>("SmtpSettings:AllowBadLineEndings"),
+		DisconnectOnTooManyInvalidCommands = c.GetValue<bool>("SmtpSettings:DisconnectOnTooManyInvalidCommands"),
+		MaxInvalidCommands    = c.GetValue<int>("SmtpSettings:MaxInvalidCommands"),
+		BindToLocalIp         = c["SmtpSettings:BindToLocalIp"] ?? string.Empty,
+		MaxRecipientsPerBatch = c.GetValue<int>("SmtpSettings:MaxRecipientsPerBatch"),
+		AddDeliveredToHeader  = c.GetValue<bool>("SmtpSettings:AddDeliveredToHeader"),
+		RuleLoopLimit         = c.GetValue<int>("SmtpSettings:RuleLoopLimit"),
+		MaxRecipientHosts     = c.GetValue<int>("SmtpSettings:MaxRecipientHosts"),
+		RelayQueuePath        = c["SmtpSettings:RelayQueuePath"] ?? string.Empty,
 		Ports                 = c.GetSection("SmtpSettings:Ports").Get<List<PortConfigDto>>() ?? []
 	};
 
@@ -160,29 +174,51 @@ public class PortConfigDto
 
 public class SmtpConfigDto
 {
+	// General
 	public string       EmlStoragePath        { get; set; } = string.Empty;
-	public int          MaxMessageSize        { get; set; }
 	public int          CommandTimeoutSeconds { get; set; }
 	public int          BackLog               { get; set; }
-	public bool         EnableAuth            { get; set; }
-	public bool         EnableStartTls        { get; set; }
-	public bool         EnableVrfy            { get; set; }
-	public bool         EnableExpn            { get; set; }
-	public bool         RequireDkim           { get; set; }
 	public string       CertificatePath       { get; set; } = string.Empty;
 	public string       CertificatePassword   { get; set; } = string.Empty;
 	public string       UserStorePath         { get; set; } = string.Empty;
 	public List<string> DnsResolvers          { get; set; } = [];
 	public List<string> LocalDomains          { get; set; } = [];
+	// Connections
 	public int          MaxConnections        { get; set; }
+	// Other
 	public string       WelcomeMessage        { get; set; } = string.Empty;
+	public int          MaxMessageSizeKb      { get; set; }
+	// Delivery
+	public int          RetryCount            { get; set; }
+	public int          RetryIntervalMinutes  { get; set; }
+	public string       LocalHostName         { get; set; } = string.Empty;
+	// Relay
 	public bool         RelayEnabled          { get; set; }
-	public string       RelayQueuePath        { get; set; } = string.Empty;
-	public bool         RelayUseTls           { get; set; }
-	public int          RelayTimeoutSeconds   { get; set; }
+	public string       RelayHost             { get; set; } = string.Empty;
+	public int          RelayPort             { get; set; }
 	public bool         RelayRequiresAuth     { get; set; }
 	public string       RelayUsername         { get; set; } = string.Empty;
 	public string       RelayPassword         { get; set; } = string.Empty;
+	public string       RelayConnectionSecurity { get; set; } = "None";
+	public string       RelayQueuePath        { get; set; } = string.Empty;
+	// RFC compliance
+	public bool         AllowPlainTextAuth    { get; set; }
+	public bool         AllowEmptySender      { get; set; }
+	public bool         AllowBadLineEndings   { get; set; }
+	public bool         DisconnectOnTooManyInvalidCommands { get; set; }
+	public int          MaxInvalidCommands    { get; set; }
+	// Advanced
+	public string       BindToLocalIp         { get; set; } = string.Empty;
+	public int          MaxRecipientsPerBatch { get; set; }
+	public bool         AddDeliveredToHeader  { get; set; }
+	public int          RuleLoopLimit         { get; set; }
+	public int          MaxRecipientHosts     { get; set; }
+	// Auth / DKIM
+	public bool         EnableAuth            { get; set; }
+	public bool         EnableStartTls        { get; set; }
+	public bool         EnableVrfy            { get; set; }
+	public bool         EnableExpn            { get; set; }
+	public bool         RequireDkim           { get; set; }
 	public List<PortConfigDto> Ports          { get; set; } = [];
 }
 

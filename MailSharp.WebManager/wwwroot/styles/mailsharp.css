@@ -399,7 +399,7 @@ a:hover { text-decoration: underline; }
 }
 .tab-btn:hover { color: var(--text); }
 .tab-btn.active {
-	color: #fff;
+	color: var(--accent);
 	border-bottom-color: var(--accent);
 }
 
