@@ -24,6 +24,8 @@ public partial class Resolver
 
 	private async Task BootstrapRootAsync(CancellationToken ct)
 	{
+		if (!File.Exists("root\\named_root.txt"))
+			return;
 		List<RR> authorities = [];
 		await foreach (var authority in RootHintsParser.ParseAsync("root\\named_root.txt", ct))
 			authorities.Add(authority);

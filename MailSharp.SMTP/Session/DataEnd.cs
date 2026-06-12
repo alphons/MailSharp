@@ -50,7 +50,8 @@ public partial class SmtpSession
 		//}
 
 		// Verify DMARC
-		string mailFromDomain = mailFrom!.Substring(mailFrom.IndexOf('@') + 1);
+		string mailFromDomain = ExtractDomain(mailFrom!);
+
 		bool dmarcValid = await dmarcChecker.CheckDmarcAsync(emlContent.ToString(), clientIp, mailFromDomain, mailFromDomain, ct);
 		if (!dmarcValid && configuration.GetValue<bool>("DmarcSettings:RequireDmarc"))
 		{
@@ -59,9 +60,8 @@ public partial class SmtpSession
 		}
 
 		// Sign with DKIM
-		//string domain = mailFrom!.Substring(mailFrom.IndexOf('@') + 1);
-		//string selector = configuration[$"SmtpSettings:Dkim:{domain}:Selector"] ?? "default";
-		//string signedEml = dkimSigner.SignEmail(emlContent.ToString(), selector, domain);
+		//string selector = configuration[$"SmtpSettings:Dkim:{mailFromDomain}:Selector"] ?? "default";
+		//string signedEml = dkimSigner.SignEmail(emlContent.ToString(), selector, mailFromDomain);
 
 		string signedEml = emlContent.ToString();
 
@@ -75,16 +75,28 @@ public partial class SmtpSession
 
 		logger.LogInformation("Received email from {MailFrom} to {RcptTo} saved as {FileName}", mailFrom, string.Join(", ", rcptTo), fileName);
 
-		string senderDomain = mailFrom!.Contains('@') ? mailFrom[(mailFrom.IndexOf('@') + 1)..] : mailFrom;
-		var rcptDomains = rcptTo
-			.Where(r => r.Contains('@'))
-			.Select(r => r[(r.IndexOf('@') + 1)..]);
-		metrics.MessageReceived(senderDomain, rcptDomains, signedEml.Length);
+		var rcptDomains = rcptTo.Select(r => ExtractDomain(r)).Where(d => d.Length > 0);
+		metrics.MessageReceived(mailFromDomain, rcptDomains, signedEml.Length);
 
 		mailFrom = null;
 		rcptTo.Clear();
 		data.Clear();
 	}
 
+	// Extracts the FQDN from any address format:
+	//   user@domain.com  →  domain.com
+	//   <user@domain.com>  →  domain.com
+	//   Display Name <user@domain.com>  →  domain.com
+	private static string ExtractDomain(string address)
+	{
+		int at = address.IndexOf('@');
+		if (at < 0)
+			return string.Empty;
+		string after = address[(at + 1)..];
+		int len = 0;
+		while (len < after.Length && (char.IsLetterOrDigit(after[len]) || after[len] == '.' || after[len] == '-'))
+			len++;
+		return after[..len];
+	}
 
 }
