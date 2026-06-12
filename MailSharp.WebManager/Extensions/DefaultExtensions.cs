@@ -2,6 +2,7 @@
 using MailSharp.IMAP.Extensions;
 using MailSharp.POP3.Extensions;
 using MailSharp.SMTP.Extensions;
+using MailSharp.WebManager.Services;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Mvc.Razor;
 
@@ -49,13 +50,10 @@ public static class DefaultExtensions
 	public static IServiceCollection AddMailSharpServices(this IServiceCollection services)
 	{
 		services.AddCommonServices();
-
 		services.AddSmtpServices();
-
 		services.AddPop3Services();
-
 		services.AddImapServices();
-
+		services.AddScoped<ConfigService>();
 		return services;
 	}
 

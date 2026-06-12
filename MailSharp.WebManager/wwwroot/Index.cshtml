@@ -40,10 +40,20 @@
 			<button class="tab-btn" id="tab-pop3" data-panel="panel-pop3">
 				<span class="tab-dot"></span>POP3
 			</button>
+			<button class="tab-btn" id="tab-other" data-panel="panel-other">
+				&#9881;
+			</button>
 		</nav>
 
 		<!-- ── SMTP ───────────────────────────────────────── -->
 		<div class="tab-panel active" id="panel-smtp">
+
+			<div class="inline-settings" id="cfg-smtp-wrap">
+				<button class="inline-settings__toggle" id="cfg-smtp-toggle" data-target="cfg-smtp-body">
+					&#9881; Settings
+				</button>
+				<div class="inline-settings__body" id="cfg-smtp-body"></div>
+			</div>
 
 			<div class="section-label">Connections &amp; Traffic</div>
 			<div class="stats-grid">
@@ -114,10 +124,18 @@
 					<div id="smtp-tbl-recipients"><div class="domain-card__empty">No data yet</div></div>
 				</div>
 			</div>
+
 		</div>
 
 		<!-- ── IMAP ───────────────────────────────────────── -->
 		<div class="tab-panel" id="panel-imap">
+
+			<div class="inline-settings" id="cfg-imap-wrap">
+				<button class="inline-settings__toggle" id="cfg-imap-toggle" data-target="cfg-imap-body">
+					&#9881; Settings
+				</button>
+				<div class="inline-settings__body" id="cfg-imap-body"></div>
+			</div>
 
 			<div class="section-label">Connections &amp; Traffic</div>
 			<div class="stats-grid">
@@ -175,6 +193,13 @@
 		<!-- ── POP3 ───────────────────────────────────────── -->
 		<div class="tab-panel" id="panel-pop3">
 
+			<div class="inline-settings" id="cfg-pop3-wrap">
+				<button class="inline-settings__toggle" id="cfg-pop3-toggle" data-target="cfg-pop3-body">
+					&#9881; Settings
+				</button>
+				<div class="inline-settings__body" id="cfg-pop3-body"></div>
+			</div>
+
 			<div class="section-label">Connections &amp; Traffic</div>
 			<div class="stats-grid">
 				<div class="stat-card stat-card--blue">
@@ -221,6 +246,13 @@
 			<div class="domain-card">
 				<div class="domain-card__header">Most Active Accounts</div>
 				<div id="pop3-tbl-users"><div class="domain-card__empty">No data yet</div></div>
+			</div>
+		</div>
+
+		<!-- ── Other (DMARC / Mailbox) ───────────────────── -->
+		<div class="tab-panel" id="panel-other">
+			<div class="settings-panel" id="cfg-other-form">
+				<div class="section-label" style="margin-top:0">Loading…</div>
 			</div>
 		</div>
 

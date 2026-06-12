@@ -5,6 +5,11 @@ var builder = WebApplication.CreateBuilder(new WebApplicationOptions
 	ContentRootPath = AppContext.BaseDirectory
 });
 
+builder.Configuration.AddJsonFile(
+	Path.Combine(AppContext.BaseDirectory, "mailsharp.override.json"),
+	optional: true,
+	reloadOnChange: true);
+
 builder.Services.AddMvcCore().WithMultiParameterModelBinding();
 
 builder.Services.AddRazorUnderRoot();

@@ -32,7 +32,14 @@ public class RelayService(IConfiguration configuration, SmtpMetrics metrics, ILo
 			{
 				await ProcessEmailAsync(emlPath, stoppingToken);
 			}
-			await Task.Delay(1000, stoppingToken);
+			try
+			{
+				await Task.Delay(1000, stoppingToken);
+			}
+			catch (OperationCanceledException)
+			{
+				break;
+			}
 		}
 	}
 
@@ -40,7 +47,8 @@ public class RelayService(IConfiguration configuration, SmtpMetrics metrics, ILo
 	{
 		try
 		{
-			string emlContent = await File.ReadAllTextAsync(emlPath, ct);
+			// Use CancellationToken.None so an in-progress relay completes cleanly on shutdown
+			string emlContent = await File.ReadAllTextAsync(emlPath, CancellationToken.None);
 			string recipient = ExtractRecipient(emlContent);
 			string domain = recipient[(recipient.IndexOf('@') + 1)..];
 
@@ -88,11 +96,11 @@ public class RelayService(IConfiguration configuration, SmtpMetrics metrics, ILo
 					{
 						Body = emlContent,
 						To = { recipient }
-					}, ct);
+					}, CancellationToken.None);
 
 					metrics.IncrementRelayed();
 
-					await Task.Run(() => File.Delete(emlPath), ct);
+					File.Delete(emlPath);
 					logger.LogInformation("Relayed email to {Domain} via {MxServer}", domain, mxServer);
 					return;
 				}

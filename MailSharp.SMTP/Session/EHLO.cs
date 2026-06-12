@@ -1,4 +1,5 @@
-﻿using MailSharp.SMTP.Extensions;
+﻿using MailSharp.Common;
+using MailSharp.SMTP.Extensions;
 
 namespace MailSharp.SMTP.Session;
 
@@ -19,7 +20,8 @@ public partial class SmtpSession
 		{
 			await writer.WriteLineAsync(configuration["SmtpResponses:AuthSupport"], ct);
 		}
-		if (configuration.GetValue<bool>("SmtpSettings:EnableStartTls"))
+		// Advertise STARTTLS based on port security, not the global flag
+		if (security == SecurityEnum.StartTlsOptional || security == SecurityEnum.StartTls)
 		{
 			await writer.WriteLineAsync(configuration["SmtpResponses:StartTlsSupport"], ct);
 		}

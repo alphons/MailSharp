@@ -45,7 +45,8 @@ public class ImapServer
 	public async Task StartAsync()
 	{
 		cts = new CancellationTokenSource();
-		await Task.WhenAll(listeners.Select(context =>
+		var active = new List<ServerContext>();
+		foreach (var context in listeners)
 		{
 			try
 			{
@@ -56,6 +57,7 @@ public class ImapServer
 					new EventId(eventIdConfig.Id, eventIdConfig.Name),
 					configuration["ImapLogMessages:ServerStarted"],
 					context.Listener.LocalEndpoint, context.Security);
+				active.Add(context);
 			}
 			catch (SocketException ex)
 			{
@@ -65,10 +67,13 @@ public class ImapServer
 					new EventId(eventIdConfig.Id, eventIdConfig.Name),
 					ex,
 					configuration["ImapLogMessages:ServerStartFailed"],
-					((IPEndPoint)context.Listener.LocalEndpoint).Port);
+					((IPEndPoint)context.Listener.LocalEndpoint).Port,
+					ex.Message);
 			}
-			return Task.Run(() => AcceptClientsAsync(context, cts.Token), cts.Token);
-		}));
+		}
+		if (active.Count > 0)
+			await Task.WhenAll(active.Select(context =>
+				Task.Run(() => AcceptClientsAsync(context, cts.Token), cts.Token)));
 		await StopAsync();
 	}
 

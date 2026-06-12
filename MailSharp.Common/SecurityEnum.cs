@@ -3,6 +3,7 @@
 public enum SecurityEnum
 {
 	None,
-	StartTls,
-	Tls
+	StartTlsOptional,
+	StartTls,          // StartTLS required before MAIL/AUTH/DATA
+	Tls                // Implicit TLS from connection start
 }
