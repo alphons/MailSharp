@@ -54,6 +54,7 @@ public static class DefaultExtensions
 		services.AddPop3Services();
 		services.AddImapServices();
 		services.AddScoped<ConfigService>();
+		services.AddSingleton<DomainService>();
 		return services;
 	}
 

@@ -39,6 +39,9 @@
 			<button class="tab-btn" id="tab-pop3" data-panel="panel-pop3">
 				<span class="tab-dot"></span>POP3
 			</button>
+			<button class="tab-btn" id="tab-domains" data-panel="panel-domains">
+				&#127760; Domains
+			</button>
 		</nav>
 
 		<!-- ── SMTP ───────────────────────────────────────── -->
@@ -245,7 +248,20 @@
 			</div>
 		</div>
 
-<div class="refresh-bar">
+		<!-- ── Domains ─────────────────────────────────────── -->
+		<div class="tab-panel" id="panel-domains">
+
+			<div class="domain-mgr-toolbar">
+				<input type="text" id="dom-new-name" placeholder="example.com" class="dom-input">
+				<button class="btn-save" id="dom-add-btn">+ Add domain</button>
+				<span class="save-msg" id="msg-domains"></span>
+			</div>
+
+			<div id="dom-list"></div>
+
+		</div>
+
+		<div class="refresh-bar">
 			<div class="refresh-dot" id="refresh-dot"></div>
 			<span>Updated <span id="refresh-time">—</span></span>
 		</div>

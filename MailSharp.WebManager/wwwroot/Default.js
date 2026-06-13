@@ -31,6 +31,7 @@ document.addEventListener('DOMContentLoaded', () =>
 	initTabs();
 	refreshAll();
 	setInterval(refreshAll, 5000);
+	initDomains();
 });
 
 // ── Theme ──────────────────────────────────────────────────
@@ -680,3 +681,504 @@ function fmtDate(iso)
 {
 	return new Date(iso).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' });
 }
+
+// ── Domain manager ─────────────────────────────────────────
+
+let _domains = [];
+const _openSections = {};   // id → active sub-tab name
+
+const DOM_TABS = ['Aliases', 'User Aliases', 'Email Lists', 'Limits', 'DKIM', 'Advanced'];
+
+function initDomains()
+{
+	const addBtn   = $id('dom-add-btn');
+	const addInput = $id('dom-new-name');
+	if (!addBtn) return;
+
+	addBtn.addEventListener('click', async () =>
+	{
+		const name = addInput.value.trim();
+		if (!name) return;
+		try
+		{
+			await apiFetch('/api/domain', { name });
+			addInput.value = '';
+			await loadDomains();
+			showMsg($id('msg-domains'), true, 'Domain added');
+		}
+		catch (e) { showMsg($id('msg-domains'), false, e.message || 'Error'); }
+	});
+	addInput.addEventListener('keydown', e => { if (e.key === 'Enter') addBtn.click(); });
+
+	// delegated events on #dom-list
+	const list = $id('dom-list');
+	if (!list) return;
+	list.addEventListener('click',  domListClick);
+	list.addEventListener('change', domListChange);
+	list.addEventListener('keydown', domListKeydown);
+}
+
+function domListClick(e)
+{
+	const t = e.target;
+
+	if (t.dataset.action === 'delete-domain')  { deleteDomain(t.dataset.id); return; }
+	if (t.dataset.action === 'toggle-expand')  { toggleExpand(t.dataset.id); return; }
+	if (t.dataset.action === 'sub-tab')        { setSubTab(t.dataset.id, t.dataset.tab); return; }
+	if (t.dataset.action === 'save-domain')    { saveDomain(t.dataset.id); return; }
+	if (t.dataset.action === 'add-alias')      { addTag(t.dataset.id, 'aliases', `dom-alias-input-${t.dataset.id}`); return; }
+	if (t.dataset.action === 'remove-alias')   { removeTag(t.dataset.id, 'aliases', t.dataset.value); return; }
+	if (t.dataset.action === 'add-ualias')     { addUserAlias(t.dataset.id); return; }
+	if (t.dataset.action === 'remove-ualias')  { removeUserAlias(t.dataset.id, t.dataset.idx); return; }
+	if (t.dataset.action === 'add-list')       { addEmailList(t.dataset.id); return; }
+	if (t.dataset.action === 'remove-list')    { removeEmailList(t.dataset.id, t.dataset.listid); return; }
+	if (t.dataset.action === 'add-list-member'){ addListMember(t.dataset.id, t.dataset.listid); return; }
+	if (t.dataset.action === 'remove-list-member') { removeListMember(t.dataset.id, t.dataset.listid, t.dataset.value); return; }
+}
+
+function domListChange(e)
+{
+	const t = e.target;
+	if (t.dataset.action === 'toggle-enabled')
+	{
+		const d = _domains.find(x => x.id === t.dataset.id);
+		if (d) { d.enabled = t.checked; saveDomain(d.id); }
+	}
+}
+
+function domListKeydown(e)
+{
+	if (e.key !== 'Enter') return;
+	const t = e.target;
+	if (t.dataset.enter === 'add-alias')   { addTag(t.dataset.id, 'aliases', t.id); return; }
+	if (t.dataset.enter === 'add-ualias')  { addUserAlias(t.dataset.id); return; }
+	if (t.dataset.enter === 'add-list')    { addEmailList(t.dataset.id); return; }
+	if (t.dataset.enter === 'add-lmember') { addListMember(t.dataset.id, t.dataset.listid); return; }
+}
+
+// ── Load / render ──────────────────────────────────────────
+
+async function loadDomains()
+{
+	_domains = await apiFetch('/api/domain');
+	renderDomains();
+}
+
+function renderDomains()
+{
+	const el = $id('dom-list');
+	if (!el) return;
+	if (_domains.length === 0) { el.innerHTML = '<p class="dom-empty">No domains configured yet.</p>'; return; }
+	el.innerHTML = _domains.map(d => domainCard(d)).join('');
+}
+
+function domainCard(d)
+{
+	const open      = !!_openSections[d.id];
+	const activeTab = _openSections[d.id] || 'Aliases';
+	const statusCls = d.enabled ? 'dom-status--on' : 'dom-status--off';
+
+	const tabBar = DOM_TABS.map(t =>
+		`<button class="dom-subtab-btn${t === activeTab ? ' active' : ''}" data-action="sub-tab" data-id="${esc(d.id)}" data-tab="${esc(t)}">${esc(t)}</button>`
+	).join('');
+
+	const body = open ? `
+		<div class="dom-subtab-nav">${tabBar}</div>
+		<div class="dom-subtab-body">
+			${buildSubTab(d, activeTab)}
+		</div>
+		<div class="dom-card__footer">
+			<button class="btn-save" data-action="save-domain" data-id="${esc(d.id)}">Save</button>
+			<span class="save-msg" id="dom-msg-${esc(d.id)}"></span>
+		</div>` : '';
+
+	return `
+	<div class="dom-card${open ? ' dom-card--open' : ''}" id="dom-card-${esc(d.id)}">
+		<div class="dom-card__header">
+			<span class="dom-status-dot ${statusCls}"></span>
+			<input type="text" class="dom-name-input" id="dom-name-${esc(d.id)}" value="${esc(d.name)}" placeholder="domain.tld">
+			<label class="toggle" title="Enable / disable domain">
+				<input type="checkbox" data-action="toggle-enabled" data-id="${esc(d.id)}"${d.enabled ? ' checked' : ''}>
+				<span class="toggle-track"></span>
+			</label>
+			<button class="dom-expand-btn" data-action="toggle-expand" data-id="${esc(d.id)}" title="${open ? 'Collapse' : 'Expand'}">${open ? '▴' : '▾'}</button>
+			<button class="dom-delete-btn" data-action="delete-domain" data-id="${esc(d.id)}" title="Delete domain">&times;</button>
+		</div>
+		${body}
+	</div>`;
+}
+
+function buildSubTab(d, tab)
+{
+	switch (tab)
+	{
+		case 'Aliases':      return buildAliasesTab(d);
+		case 'User Aliases': return buildUserAliasesTab(d);
+		case 'Email Lists':  return buildEmailListsTab(d);
+		case 'Limits':       return buildLimitsTab(d);
+		case 'DKIM':         return buildDkimTab(d);
+		case 'Advanced':     return buildAdvancedTab(d);
+		default: return '';
+	}
+}
+
+// ── Sub-tab: Aliases ───────────────────────────────────────
+
+function buildAliasesTab(d)
+{
+	const tags = (d.aliases || []).map(a => `
+		<span class="dom-alias-tag">${esc(a)}
+			<button class="dom-alias-remove" data-action="remove-alias" data-id="${esc(d.id)}" data-value="${esc(a)}">&times;</button>
+		</span>`).join('');
+	return `
+	<div class="cfg-section-title">Domain aliases</div>
+	<p class="dom-hint">Other domain names that resolve to this domain.</p>
+	<div class="dom-alias-tags" id="dom-alias-tags-${esc(d.id)}">${tags || '<span class="dom-hint">None</span>'}</div>
+	<div class="dom-alias-add-row">
+		<input type="text" class="dom-input" id="dom-alias-input-${esc(d.id)}"
+			placeholder="alias.tld" data-enter="add-alias" data-id="${esc(d.id)}">
+		<button class="btn-add-port" data-action="add-alias" data-id="${esc(d.id)}">+ Add alias</button>
+	</div>`;
+}
+
+// ── Sub-tab: User Aliases ──────────────────────────────────
+
+function buildUserAliasesTab(d)
+{
+	const rows = (d.userAliases || []).map((ua, i) => `
+		<tr>
+			<td><input type="text" class="dom-input" id="ua-alias-${esc(d.id)}-${i}" value="${esc(ua.alias)}" placeholder="alias"></td>
+			<td style="padding:0 8px;color:var(--text-muted)">→</td>
+			<td><input type="text" class="dom-input" id="ua-target-${esc(d.id)}-${i}" value="${esc(ua.target)}" placeholder="target@example.com"></td>
+			<td><button class="dom-delete-btn" data-action="remove-ualias" data-id="${esc(d.id)}" data-idx="${i}">&times;</button></td>
+		</tr>`).join('');
+
+	return `
+	<div class="cfg-section-title">User aliases</div>
+	<p class="dom-hint">Map an alias address to another mailbox.</p>
+	<table class="dom-table" id="ua-table-${esc(d.id)}">
+		<thead><tr><th>Alias (local part)</th><th></th><th>Target address</th><th></th></tr></thead>
+		<tbody>${rows}</tbody>
+	</table>
+	<div class="dom-alias-add-row" style="margin-top:8px">
+		<input type="text" class="dom-input" id="ua-new-alias-${esc(d.id)}" placeholder="alias"
+			data-enter="add-ualias" data-id="${esc(d.id)}">
+		<span style="color:var(--text-muted);padding:0 6px">→</span>
+		<input type="text" class="dom-input" id="ua-new-target-${esc(d.id)}" placeholder="target@example.com"
+			data-enter="add-ualias" data-id="${esc(d.id)}">
+		<button class="btn-add-port" data-action="add-ualias" data-id="${esc(d.id)}">+ Add</button>
+	</div>`;
+}
+
+// ── Sub-tab: Email Lists ───────────────────────────────────
+
+function buildEmailListsTab(d)
+{
+	const lists = (d.emailLists || []).map(list => {
+		const memberTags = (list.members || []).map(m => `
+			<span class="dom-alias-tag">${esc(m)}
+				<button class="dom-alias-remove" data-action="remove-list-member"
+					data-id="${esc(d.id)}" data-listid="${esc(list.id)}" data-value="${esc(m)}">&times;</button>
+			</span>`).join('');
+		return `
+		<div class="dom-list-block">
+			<div class="dom-list-block__header">
+				<span class="dom-list-name">${esc(list.name)}@${esc(d.name)}</span>
+				<button class="dom-delete-btn" data-action="remove-list" data-id="${esc(d.id)}" data-listid="${esc(list.id)}">&times;</button>
+			</div>
+			<div class="dom-alias-tags">${memberTags || '<span class="dom-hint">No members</span>'}</div>
+			<div class="dom-alias-add-row">
+				<input type="text" class="dom-input" id="lm-input-${esc(list.id)}" placeholder="member@example.com"
+					data-enter="add-lmember" data-id="${esc(d.id)}" data-listid="${esc(list.id)}">
+				<button class="btn-add-port" data-action="add-list-member"
+					data-id="${esc(d.id)}" data-listid="${esc(list.id)}">+ Add member</button>
+			</div>
+		</div>`;
+	}).join('');
+
+	return `
+	<div class="cfg-section-title">Email lists / distribution groups</div>
+	${lists || '<p class="dom-hint">No lists yet.</p>'}
+	<div class="dom-alias-add-row" style="margin-top:12px">
+		<input type="text" class="dom-input" id="list-new-${esc(d.id)}" placeholder="listname"
+			data-enter="add-list" data-id="${esc(d.id)}">
+		<span style="color:var(--text-muted);padding:0 4px 0 2px">@${esc(d.name)}</span>
+		<button class="btn-add-port" data-action="add-list" data-id="${esc(d.id)}">+ Create list</button>
+	</div>`;
+}
+
+// ── Sub-tab: Limits ────────────────────────────────────────
+
+function buildLimitsTab(d)
+{
+	const lim = d.limits || {};
+	return `
+	<div class="cfg-section-title">Storage limits</div>
+	<div class="form-grid">
+		${field(`lim-mailbox-${d.id}`,  'Max mailbox size (KB)',              lim.maxMailboxSizeKb  ?? 0, 'number')}
+		${field(`lim-allocated-${d.id}`,'Total allocated storage (KB)',       lim.allocatedSizeKb   ?? 0, 'number')}
+		${field(`lim-msgsize-${d.id}`,  'Max message size (KB)',              lim.maxMessageSizeKb  ?? 0, 'number')}
+		${field(`lim-accounts-${d.id}`, 'Max total size all accounts (KB)',   lim.maxAccountsSizeKb ?? 0, 'number')}
+	</div>
+	<p class="dom-hint">0 = unlimited.</p>`;
+}
+
+// ── Sub-tab: DKIM ──────────────────────────────────────────
+
+function buildDkimTab(d)
+{
+	const dk = d.dkim || {};
+	const hOpts = ['Simple', 'Relaxed'].map(v =>
+		`<option value="${v}"${(dk.headerMethod ?? 'Relaxed') === v ? ' selected' : ''}>${v}</option>`).join('');
+	const bOpts = ['Simple', 'Relaxed'].map(v =>
+		`<option value="${v}"${(dk.bodyMethod ?? 'Relaxed') === v ? ' selected' : ''}>${v}</option>`).join('');
+	const aOpts = ['SHA256', 'SHA1'].map(v =>
+		`<option value="${v}"${(dk.algorithm ?? 'SHA256') === v ? ' selected' : ''}>${v}</option>`).join('');
+
+	return `
+	<div class="toggle-list">
+		${toggle(`dkim-enabled-${d.id}`, 'Enable DKIM signing', 'Sign outgoing messages with DKIM', dk.enabled ?? false)}
+	</div>
+	<div class="form-grid">
+		${field(`dkim-keyfile-${d.id}`,  'Private key file',  dk.privateKeyFile ?? '')}
+		${field(`dkim-selector-${d.id}`, 'Selector',          dk.selector       ?? '')}
+	</div>
+	<div class="form-grid">
+		<div class="form-field">
+			<label for="dkim-hmethod-${esc(d.id)}">Header canonicalization</label>
+			<select id="dkim-hmethod-${esc(d.id)}">${hOpts}</select>
+		</div>
+		<div class="form-field">
+			<label for="dkim-bmethod-${esc(d.id)}">Body canonicalization</label>
+			<select id="dkim-bmethod-${esc(d.id)}">${bOpts}</select>
+		</div>
+		<div class="form-field">
+			<label for="dkim-algo-${esc(d.id)}">Signing algorithm</label>
+			<select id="dkim-algo-${esc(d.id)}">${aOpts}</select>
+		</div>
+	</div>`;
+}
+
+// ── Sub-tab: Advanced ──────────────────────────────────────
+
+function buildAdvancedTab(d)
+{
+	return `
+	<div class="cfg-section-title">Catch-all</div>
+	<p class="dom-hint">All mail to unknown addresses on this domain is delivered here.</p>
+	<div class="form-grid">
+		<div class="form-field">
+			<label>Catch-all address</label>
+			<div class="dom-catchall-row">
+				<input type="text" class="dom-input" id="adv-catchall-${esc(d.id)}" value="${esc(d.catchAll ?? '')}" placeholder="username">
+				<span class="dom-catchall-suffix">@${esc(d.name)}</span>
+			</div>
+		</div>
+	</div>`;
+}
+
+// ── Collect helpers ────────────────────────────────────────
+
+function collectDomain(d)
+{
+	const id = d.id;
+	return {
+		id:      d.id,
+		name:    $id(`dom-name-${id}`)?.value.trim()    || d.name,
+		enabled: d.enabled,
+		aliases: d.aliases,
+		userAliases: collectUserAliases(d),
+		emailLists:  d.emailLists,
+		limits:      collectLimits(d),
+		dkim:        collectDkim(d),
+		catchAll:    $id(`adv-catchall-${id}`)?.value.trim() ?? d.catchAll
+	};
+}
+
+function collectUserAliases(d)
+{
+	const rows = [];
+	(d.userAliases || []).forEach((_, i) =>
+	{
+		const alias  = $id(`ua-alias-${d.id}-${i}`)?.value.trim();
+		const target = $id(`ua-target-${d.id}-${i}`)?.value.trim();
+		if (alias && target) rows.push({ alias, target });
+	});
+	return rows;
+}
+
+function collectLimits(d)
+{
+	return {
+		maxMailboxSizeKb:  parseInt($id(`lim-mailbox-${d.id}`)?.value)   || 0,
+		allocatedSizeKb:   parseInt($id(`lim-allocated-${d.id}`)?.value) || 0,
+		maxMessageSizeKb:  parseInt($id(`lim-msgsize-${d.id}`)?.value)   || 0,
+		maxAccountsSizeKb: parseInt($id(`lim-accounts-${d.id}`)?.value)  || 0
+	};
+}
+
+function collectDkim(d)
+{
+	return {
+		enabled:        $id(`dkim-enabled-${d.id}`)?.checked ?? false,
+		privateKeyFile: $id(`dkim-keyfile-${d.id}`)?.value.trim()   ?? '',
+		selector:       $id(`dkim-selector-${d.id}`)?.value.trim()  ?? '',
+		headerMethod:   $id(`dkim-hmethod-${d.id}`)?.value          ?? 'Relaxed',
+		bodyMethod:     $id(`dkim-bmethod-${d.id}`)?.value          ?? 'Relaxed',
+		algorithm:      $id(`dkim-algo-${d.id}`)?.value             ?? 'SHA256'
+	};
+}
+
+// ── Actions ────────────────────────────────────────────────
+
+function toggleExpand(id)
+{
+	if (_openSections[id]) delete _openSections[id];
+	else _openSections[id] = 'Aliases';
+	renderDomains();
+}
+
+function setSubTab(id, tab)
+{
+	// collect current state before re-render so edits are not lost
+	const d = _domains.find(x => x.id === id);
+	if (d) mergeCollected(d);
+	_openSections[id] = tab;
+	renderDomains();
+}
+
+function mergeCollected(d)
+{
+	const tab = _openSections[d.id];
+	if (!tab) return;
+	if (tab === 'User Aliases') d.userAliases = collectUserAliases(d);
+	if (tab === 'Limits')       d.limits       = collectLimits(d);
+	if (tab === 'DKIM')         d.dkim         = collectDkim(d);
+	if (tab === 'Advanced')     d.catchAll     = $id(`adv-catchall-${d.id}`)?.value.trim() ?? d.catchAll;
+	const nameEl = $id(`dom-name-${d.id}`);
+	if (nameEl) d.name = nameEl.value.trim() || d.name;
+}
+
+async function saveDomain(id)
+{
+	const d = _domains.find(x => x.id === id);
+	if (!d) return;
+	mergeCollected(d);
+	const payload = collectDomain(d);
+	try
+	{
+		await apiFetch(`/api/domain/${id}`, payload);
+		Object.assign(d, payload);
+		showMsg($id(`dom-msg-${id}`), true, 'Saved');
+	}
+	catch (e) { showMsg($id(`dom-msg-${id}`), false, e.message || 'Error'); }
+}
+
+async function deleteDomain(id)
+{
+	if (!confirm('Delete this domain and all its settings?')) return;
+	try
+	{
+		const res = await fetch(`/api/domain/${id}`, { method: 'DELETE' });
+		if (!res.ok) throw new Error(`HTTP ${res.status}`);
+		delete _openSections[id];
+		await loadDomains();
+		showMsg($id('msg-domains'), true, 'Deleted');
+	}
+	catch (e) { showMsg($id('msg-domains'), false, e.message || 'Error'); }
+}
+
+// ── Tag helpers ────────────────────────────────────────────
+
+function addTag(domainId, field_, inputId)
+{
+	const d     = _domains.find(x => x.id === domainId);
+	const input = $id(inputId);
+	if (!d || !input) return;
+	const val = input.value.trim().toLowerCase();
+	if (!val || d[field_].includes(val)) { input.value = ''; return; }
+	d[field_] = [...d[field_], val];
+	input.value = '';
+	renderDomains();
+}
+
+function removeTag(domainId, field_, value)
+{
+	const d = _domains.find(x => x.id === domainId);
+	if (!d) return;
+	d[field_] = d[field_].filter(v => v !== value);
+	renderDomains();
+}
+
+// ── User alias helpers ─────────────────────────────────────
+
+function addUserAlias(domainId)
+{
+	const d      = _domains.find(x => x.id === domainId);
+	const alias  = $id(`ua-new-alias-${domainId}`)?.value.trim();
+	const target = $id(`ua-new-target-${domainId}`)?.value.trim();
+	if (!d || !alias || !target) return;
+	d.userAliases = collectUserAliases(d);
+	d.userAliases.push({ alias, target });
+	$id(`ua-new-alias-${domainId}`).value  = '';
+	$id(`ua-new-target-${domainId}`).value = '';
+	renderDomains();
+}
+
+function removeUserAlias(domainId, idx)
+{
+	const d = _domains.find(x => x.id === domainId);
+	if (!d) return;
+	d.userAliases = collectUserAliases(d);
+	d.userAliases.splice(parseInt(idx), 1);
+	renderDomains();
+}
+
+// ── Email list helpers ─────────────────────────────────────
+
+function addEmailList(domainId)
+{
+	const d    = _domains.find(x => x.id === domainId);
+	const name = $id(`list-new-${domainId}`)?.value.trim().toLowerCase();
+	if (!d || !name) return;
+	d.emailLists = d.emailLists || [];
+	d.emailLists.push({ id: crypto.randomUUID(), name, members: [] });
+	$id(`list-new-${domainId}`).value = '';
+	renderDomains();
+}
+
+function removeEmailList(domainId, listId)
+{
+	const d = _domains.find(x => x.id === domainId);
+	if (!d) return;
+	d.emailLists = d.emailLists.filter(l => l.id !== listId);
+	renderDomains();
+}
+
+function addListMember(domainId, listId)
+{
+	const d    = _domains.find(x => x.id === domainId);
+	const list = d?.emailLists?.find(l => l.id === listId);
+	const val  = $id(`lm-input-${listId}`)?.value.trim().toLowerCase();
+	if (!list || !val || list.members.includes(val)) return;
+	list.members.push(val);
+	$id(`lm-input-${listId}`).value = '';
+	renderDomains();
+}
+
+function removeListMember(domainId, listId, value)
+{
+	const d    = _domains.find(x => x.id === domainId);
+	const list = d?.emailLists?.find(l => l.id === listId);
+	if (!list) return;
+	list.members = list.members.filter(m => m !== value);
+	renderDomains();
+}
+
+// load domains when Domains tab becomes active
+document.addEventListener('DOMContentLoaded', () =>
+{
+	const domainsBtn = $id('tab-domains');
+	if (domainsBtn)
+		domainsBtn.addEventListener('click', () => { if (_domains.length === 0) loadDomains(); });
+});
