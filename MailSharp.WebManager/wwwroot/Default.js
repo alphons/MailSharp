@@ -9,14 +9,15 @@ function esc(str)
 		({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
-async function apiFetch(url, data)
+async function apiFetch(url, data, method)
 {
 	const opts = data
-		? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }
+		? { method: method ?? 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }
 		: { method: 'GET' };
 	const res = await fetch(url, opts);
 	if (!res.ok) throw new Error(`HTTP ${res.status}`);
-	if (res.status === 204) return null;
+	const ct = res.headers.get('content-type') ?? '';
+	if (res.status === 204 || !ct.includes('application/json')) return null;
 	return res.json();
 }
 
@@ -687,7 +688,7 @@ function fmtDate(iso)
 let _domains = [];
 const _openSections = {};   // id → active sub-tab name
 
-const DOM_TABS = ['Aliases', 'User Aliases', 'Email Lists', 'Limits', 'DKIM', 'Advanced'];
+const DOM_TABS = ['Users', 'User Aliases', 'Email Lists', 'Limits', 'DKIM', 'Domein-aliases', 'Advanced'];
 
 function initDomains()
 {
@@ -723,7 +724,8 @@ function domListClick(e)
 	const t = e.target;
 
 	if (t.dataset.action === 'delete-domain')  { deleteDomain(t.dataset.id); return; }
-	if (t.dataset.action === 'toggle-expand')  { toggleExpand(t.dataset.id); return; }
+	if (t.dataset.action === 'toggle-expand' || t.classList.contains('dom-card__header')) { toggleExpand(t.dataset.id ?? t.closest('.dom-card')?.id?.replace('dom-card-','')); return; }
+	if (t.classList.contains('dom-name-input')) { const id = t.closest('.dom-card')?.id?.replace('dom-card-',''); if (id && !_openSections[id]) toggleExpand(id); return; }
 	if (t.dataset.action === 'sub-tab')        { setSubTab(t.dataset.id, t.dataset.tab); return; }
 	if (t.dataset.action === 'save-domain')    { saveDomain(t.dataset.id); return; }
 	if (t.dataset.action === 'add-alias')      { addTag(t.dataset.id, 'aliases', `dom-alias-input-${t.dataset.id}`); return; }
@@ -734,6 +736,8 @@ function domListClick(e)
 	if (t.dataset.action === 'remove-list')    { removeEmailList(t.dataset.id, t.dataset.listid); return; }
 	if (t.dataset.action === 'add-list-member'){ addListMember(t.dataset.id, t.dataset.listid); return; }
 	if (t.dataset.action === 'remove-list-member') { removeListMember(t.dataset.id, t.dataset.listid, t.dataset.value); return; }
+	if (t.dataset.action === 'add-user')       { addDomainUser(t.dataset.id); return; }
+	if (t.dataset.action === 'remove-user')    { removeDomainUser(t.dataset.id, t.dataset.userid); return; }
 }
 
 function domListChange(e)
@@ -751,6 +755,7 @@ function domListKeydown(e)
 	if (e.key !== 'Enter') return;
 	const t = e.target;
 	if (t.dataset.enter === 'add-alias')   { addTag(t.dataset.id, 'aliases', t.id); return; }
+	if (t.dataset.enter === 'add-user')    { addDomainUser(t.dataset.id); return; }
 	if (t.dataset.enter === 'add-ualias')  { addUserAlias(t.dataset.id); return; }
 	if (t.dataset.enter === 'add-list')    { addEmailList(t.dataset.id); return; }
 	if (t.dataset.enter === 'add-lmember') { addListMember(t.dataset.id, t.dataset.listid); return; }
@@ -794,15 +799,14 @@ function domainCard(d)
 
 	return `
 	<div class="dom-card${open ? ' dom-card--open' : ''}" id="dom-card-${esc(d.id)}">
-		<div class="dom-card__header">
+		<div class="dom-card__header" data-action="toggle-expand" data-id="${esc(d.id)}" style="cursor:pointer" title="${open ? 'Collapse' : 'Expand'}">
 			<span class="dom-status-dot ${statusCls}"></span>
 			<input type="text" class="dom-name-input" id="dom-name-${esc(d.id)}" value="${esc(d.name)}" placeholder="domain.tld">
-			<label class="toggle" title="Enable / disable domain">
+			<label class="toggle" title="Enable / disable domain" onclick="event.stopPropagation()">
 				<input type="checkbox" data-action="toggle-enabled" data-id="${esc(d.id)}"${d.enabled ? ' checked' : ''}>
 				<span class="toggle-track"></span>
 			</label>
-			<button class="dom-expand-btn" data-action="toggle-expand" data-id="${esc(d.id)}" title="${open ? 'Collapse' : 'Expand'}">${open ? '▴' : '▾'}</button>
-			<button class="dom-delete-btn" data-action="delete-domain" data-id="${esc(d.id)}" title="Delete domain">&times;</button>
+			<button class="dom-delete-btn" data-action="delete-domain" data-id="${esc(d.id)}" title="Delete domain" onclick="event.stopPropagation()">&times;</button>
 		</div>
 		${body}
 	</div>`;
@@ -812,7 +816,8 @@ function buildSubTab(d, tab)
 {
 	switch (tab)
 	{
-		case 'Aliases':      return buildAliasesTab(d);
+		case 'Domein-aliases': return buildAliasesTab(d);
+		case 'Users':          return buildUsersTab(d);
 		case 'User Aliases': return buildUserAliasesTab(d);
 		case 'Email Lists':  return buildEmailListsTab(d);
 		case 'Limits':       return buildLimitsTab(d);
@@ -839,6 +844,94 @@ function buildAliasesTab(d)
 			placeholder="alias.tld" data-enter="add-alias" data-id="${esc(d.id)}">
 		<button class="btn-add-port" data-action="add-alias" data-id="${esc(d.id)}">+ Add alias</button>
 	</div>`;
+}
+
+// ── Sub-tab: Users ─────────────────────────────────────────
+
+function buildUsersTab(d)
+{
+	const users = d.users || [];
+	const stats = d._stats || {};
+
+	const rows = users.map(u =>
+	{
+		const s          = stats[u.id] || {};
+		const sizeMb     = s.sizeMb     != null ? s.sizeMb.toFixed(2) + ' MB' : '—';
+		const lastActive = s.lastActivity ? timeSince(s.lastActivity)         : '—';
+		const usedPct    = (u.maxSizeMb > 0 && s.sizeMb != null)
+			? Math.min(100, Math.round((s.sizeMb / u.maxSizeMb) * 100)) : null;
+
+		const bar = usedPct != null ? `
+			<div class="usr-bar-track" title="${usedPct}%">
+				<div class="usr-bar-fill${usedPct >= 90 ? ' usr-bar-fill--warn' : ''}" style="width:${usedPct}%"></div>
+			</div>` : '';
+
+		return `
+		<tr class="usr-row" id="usr-row-${esc(u.id)}">
+			<td>
+				<div class="usr-address-cell">
+					<input type="text" class="dom-input usr-username" id="usr-name-${esc(u.id)}"
+						value="${esc(u.username)}" placeholder="username">
+					<span class="usr-domain-suffix">@${esc(d.name)}</span>
+				</div>
+			</td>
+			<td>
+				<input type="password" class="dom-input usr-password" id="usr-pass-${esc(u.id)}"
+					value="${esc(u.password)}" placeholder="••••••••" autocomplete="new-password">
+			</td>
+			<td>
+				<div class="usr-size-cell">
+					<input type="number" class="dom-input usr-maxsize" id="usr-max-${esc(u.id)}"
+						value="${u.maxSizeMb || 0}" min="0" placeholder="0">
+					${bar}
+				</div>
+			</td>
+			<td class="usr-stat">${lastActive}</td>
+			<td class="usr-stat">${sizeMb}</td>
+			<td><button class="dom-delete-btn" data-action="remove-user"
+				data-id="${esc(d.id)}" data-userid="${esc(u.id)}">&times;</button></td>
+		</tr>`;
+	}).join('');
+
+	return `
+	<div class="cfg-section-title">Accounts on ${esc(d.name)}</div>
+	<table class="dom-table usr-table">
+		<thead>
+			<tr>
+				<th>Address</th>
+				<th>Password</th>
+				<th>Max size (MB)</th>
+				<th>Last logon</th>
+				<th>Current size</th>
+				<th></th>
+			</tr>
+		</thead>
+		<tbody id="usr-tbody-${esc(d.id)}">${rows}</tbody>
+		<tfoot>
+			<tr>
+				<td>
+					<div class="usr-address-cell">
+						<input type="text" class="dom-input" id="usr-new-name-${esc(d.id)}"
+							placeholder="username" data-enter="add-user" data-id="${esc(d.id)}">
+						<span class="usr-domain-suffix">@${esc(d.name)}</span>
+					</div>
+				</td>
+				<td>
+					<input type="password" class="dom-input" id="usr-new-pass-${esc(d.id)}"
+						placeholder="Password" autocomplete="new-password">
+				</td>
+				<td>
+					<input type="number" class="dom-input" id="usr-new-max-${esc(d.id)}"
+						placeholder="0" min="0">
+				</td>
+				<td colspan="2"></td>
+				<td>
+					<button class="btn-add-port usr-add-btn" data-action="add-user"
+						data-id="${esc(d.id)}" title="Add user">+</button>
+				</td>
+			</tr>
+		</tfoot>
+	</table>`;
 }
 
 // ── Sub-tab: User Aliases ──────────────────────────────────
@@ -987,12 +1080,23 @@ function collectDomain(d)
 		name:    $id(`dom-name-${id}`)?.value.trim()    || d.name,
 		enabled: d.enabled,
 		aliases: d.aliases,
+		users:       collectUsers(d),
 		userAliases: collectUserAliases(d),
 		emailLists:  d.emailLists,
 		limits:      collectLimits(d),
 		dkim:        collectDkim(d),
 		catchAll:    $id(`adv-catchall-${id}`)?.value.trim() ?? d.catchAll
 	};
+}
+
+function collectUsers(d)
+{
+	return (d.users || []).map(u => ({
+		id:        u.id,
+		username:  $id(`usr-name-${u.id}`)?.value.trim()   ?? u.username,
+		password:  $id(`usr-pass-${u.id}`)?.value          ?? u.password,
+		maxSizeMb: parseInt($id(`usr-max-${u.id}`)?.value) || 0
+	}));
 }
 
 function collectUserAliases(d)
@@ -1033,25 +1137,39 @@ function collectDkim(d)
 
 function toggleExpand(id)
 {
-	if (_openSections[id]) delete _openSections[id];
-	else _openSections[id] = 'Aliases';
+	if (_openSections[id]) { delete _openSections[id]; renderDomains(); return; }
+	_openSections[id] = 'Aliases';
 	renderDomains();
 }
 
 function setSubTab(id, tab)
 {
-	// collect current state before re-render so edits are not lost
 	const d = _domains.find(x => x.id === id);
 	if (d) mergeCollected(d);
 	_openSections[id] = tab;
 	renderDomains();
+	if (tab === 'Users' && d) loadUserStats(d);
+}
+
+async function loadUserStats(d)
+{
+	try
+	{
+		const stats = await apiFetch(`/api/domain/${d.id}/userstats`);
+		d._stats = {};
+		for (const s of stats) d._stats[s.userId] = s;
+		// only re-render if still on Users tab
+		if (_openSections[d.id] === 'Users') renderDomains();
+	}
+	catch { /* stats are optional */ }
 }
 
 function mergeCollected(d)
 {
 	const tab = _openSections[d.id];
 	if (!tab) return;
-	if (tab === 'User Aliases') d.userAliases = collectUserAliases(d);
+	if (tab === 'Users')        d.users        = collectUsers(d);
+	if (tab === 'User Aliases') d.userAliases  = collectUserAliases(d);
 	if (tab === 'Limits')       d.limits       = collectLimits(d);
 	if (tab === 'DKIM')         d.dkim         = collectDkim(d);
 	if (tab === 'Advanced')     d.catchAll     = $id(`adv-catchall-${d.id}`)?.value.trim() ?? d.catchAll;
@@ -1067,7 +1185,7 @@ async function saveDomain(id)
 	const payload = collectDomain(d);
 	try
 	{
-		await apiFetch(`/api/domain/${id}`, payload);
+		await apiFetch(`/api/domain/${id}`, payload, 'PUT');
 		Object.assign(d, payload);
 		showMsg($id(`dom-msg-${id}`), true, 'Saved');
 	}
@@ -1107,6 +1225,32 @@ function removeTag(domainId, field_, value)
 	const d = _domains.find(x => x.id === domainId);
 	if (!d) return;
 	d[field_] = d[field_].filter(v => v !== value);
+	renderDomains();
+}
+
+// ── Domain user helpers ────────────────────────────────────
+
+function addDomainUser(domainId)
+{
+	const d        = _domains.find(x => x.id === domainId);
+	const username = $id(`usr-new-name-${domainId}`)?.value.trim().toLowerCase();
+	const password = $id(`usr-new-pass-${domainId}`)?.value;
+	const maxSizeMb = parseInt($id(`usr-new-max-${domainId}`)?.value) || 0;
+	if (!d || !username || !password) return;
+	d.users = collectUsers(d);
+	d.users.push({ id: crypto.randomUUID(), username, password, maxSizeMb });
+	$id(`usr-new-name-${domainId}`).value = '';
+	$id(`usr-new-pass-${domainId}`).value = '';
+	$id(`usr-new-max-${domainId}`).value  = '';
+	renderDomains();
+}
+
+function removeDomainUser(domainId, userId)
+{
+	if (!confirm('Remove this user?')) return;
+	const d = _domains.find(x => x.id === domainId);
+	if (!d) return;
+	d.users = collectUsers(d).filter(u => u.id !== userId);
 	renderDomains();
 }
 

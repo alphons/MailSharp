@@ -897,7 +897,10 @@ a:hover { text-decoration: underline; }
 	align-items: center;
 	gap: 10px;
 	padding: 10px 16px;
+	user-select: none;
+	transition: background var(--transition);
 }
+.dom-card__header:hover { background: var(--surface-2); }
 
 .dom-status-dot {
 	width: 8px;
@@ -1075,6 +1078,75 @@ a:hover { text-decoration: underline; }
 	font-size: .88rem;
 	font-weight: 600;
 	color: var(--accent);
+}
+
+/* ── Users table ───────────────────────────────────────── */
+
+.usr-table { table-layout: fixed; }
+.usr-table th, .usr-table td { vertical-align: middle; }
+.usr-table th:nth-child(1),
+.usr-table td:nth-child(1) { width: 220px; }
+.usr-table th:nth-child(2),
+.usr-table td:nth-child(2) { width: 180px; }
+.usr-table th:nth-child(3),
+.usr-table td:nth-child(3) { width: 150px; }
+.usr-table th:nth-child(4),
+.usr-table th:nth-child(5),
+.usr-table td:nth-child(4),
+.usr-table td:nth-child(5) { width: 100px; }
+.usr-table th:last-child,
+.usr-table td:last-child    { width: 36px; }
+
+.usr-address-cell {
+	display: flex;
+	align-items: center;
+}
+.usr-address-cell .dom-input {
+	border-radius: var(--radius-sm) 0 0 var(--radius-sm);
+	flex: 1;
+	min-width: 0;
+}
+
+.usr-table tfoot td { border-top: 1px solid var(--border); padding-top: 8px; }
+
+.usr-add-btn {
+	padding: 5px 10px;
+	font-size: 1rem;
+	line-height: 1;
+}
+.usr-domain-suffix {
+	background: var(--surface-2);
+	border: 1px solid var(--border);
+	border-left: none;
+	border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+	padding: 8px;
+	font-size: .8rem;
+	font-family: var(--mono);
+	color: var(--text-muted);
+	white-space: nowrap;
+	line-height: 1;
+}
+
+.usr-size-cell { display: flex; flex-direction: column; gap: 4px; }
+
+.usr-bar-track {
+	height: 4px;
+	background: var(--surface-2);
+	border-radius: 2px;
+	overflow: hidden;
+}
+.usr-bar-fill {
+	height: 100%;
+	background: var(--accent);
+	border-radius: 2px;
+	transition: width .4s ease;
+}
+.usr-bar-fill--warn { background: var(--red); }
+
+.usr-stat {
+	font-size: .78rem;
+	font-family: var(--mono);
+	color: var(--text-muted);
 }
 
 /* ── Catch-all row ─────────────────────────────────────── */

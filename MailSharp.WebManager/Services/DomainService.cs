@@ -8,11 +8,20 @@ public class DomainConfig
 	public string            Name        { get; set; } = string.Empty;
 	public bool              Enabled     { get; set; } = true;
 	public List<string>      Aliases     { get; set; } = [];
+	public List<DomainUser>  Users       { get; set; } = [];
 	public List<UserAlias>   UserAliases { get; set; } = [];
 	public List<EmailList>   EmailLists  { get; set; } = [];
 	public DomainLimits      Limits      { get; set; } = new();
 	public DkimConfig        Dkim        { get; set; } = new();
 	public string            CatchAll    { get; set; } = string.Empty;
+}
+
+public class DomainUser
+{
+	public string Id         { get; set; } = Guid.NewGuid().ToString();
+	public string Username   { get; set; } = string.Empty;   // local part only
+	public string Password   { get; set; } = string.Empty;
+	public long   MaxSizeMb  { get; set; }
 }
 
 public class UserAlias
@@ -79,6 +88,7 @@ public class DomainService(IWebHostEnvironment env)
 			d.Name        = Norm(patch.Name);
 			d.Enabled     = patch.Enabled;
 			d.Aliases     = patch.Aliases.Select(Norm).Where(a => a.Length > 0).Distinct().ToList();
+			d.Users       = patch.Users;
 			d.UserAliases = patch.UserAliases;
 			d.EmailLists  = patch.EmailLists;
 			d.Limits      = patch.Limits;
