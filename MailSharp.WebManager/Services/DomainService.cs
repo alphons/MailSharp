@@ -112,6 +112,200 @@ public class DomainService(IWebHostEnvironment env)
 		return found;
 	}
 
+	public bool PatchGeneral(string id, string name, bool enabled, string catchAll)
+	{
+		bool found = false;
+		Mutate(list =>
+		{
+			var d = list.FirstOrDefault(x => x.Id == id);
+			if (d is null) return;
+			d.Name     = Norm(name);
+			d.Enabled  = enabled;
+			d.CatchAll = catchAll.Trim();
+			found = true;
+		});
+		return found;
+	}
+
+	public bool PatchLimits(string id, DomainLimits limits)
+	{
+		bool found = false;
+		Mutate(list =>
+		{
+			var d = list.FirstOrDefault(x => x.Id == id);
+			if (d is null) return;
+			d.Limits = limits;
+			found = true;
+		});
+		return found;
+	}
+
+	public bool PatchDkim(string id, DkimConfig dkim)
+	{
+		bool found = false;
+		Mutate(list =>
+		{
+			var d = list.FirstOrDefault(x => x.Id == id);
+			if (d is null) return;
+			d.Dkim = dkim;
+			found = true;
+		});
+		return found;
+	}
+
+	public bool AddAlias(string id, string alias)
+	{
+		bool found = false;
+		Mutate(list =>
+		{
+			var d = list.FirstOrDefault(x => x.Id == id);
+			if (d is null) return;
+			var n = Norm(alias);
+			if (!d.Aliases.Contains(n)) d.Aliases.Add(n);
+			found = true;
+		});
+		return found;
+	}
+
+	public bool RemoveAlias(string id, string alias)
+	{
+		bool found = false;
+		Mutate(list =>
+		{
+			var d = list.FirstOrDefault(x => x.Id == id);
+			if (d is null) return;
+			d.Aliases.Remove(Norm(alias));
+			found = true;
+		});
+		return found;
+	}
+
+	public bool AddUser(string id, DomainUser user)
+	{
+		bool found = false;
+		Mutate(list =>
+		{
+			var d = list.FirstOrDefault(x => x.Id == id);
+			if (d is null) return;
+			d.Users.Add(user);
+			found = true;
+		});
+		return found;
+	}
+
+	public bool UpdateUser(string id, string userId, DomainUser patch)
+	{
+		bool found = false;
+		Mutate(list =>
+		{
+			var d = list.FirstOrDefault(x => x.Id == id);
+			var u = d?.Users.FirstOrDefault(x => x.Id == userId);
+			if (u is null) return;
+			u.Username  = patch.Username.Trim().ToLowerInvariant();
+			u.Password  = patch.Password;
+			u.MaxSizeMb = patch.MaxSizeMb;
+			found = true;
+		});
+		return found;
+	}
+
+	public bool DeleteUser(string id, string userId)
+	{
+		bool found = false;
+		Mutate(list =>
+		{
+			var d = list.FirstOrDefault(x => x.Id == id);
+			if (d is null) return;
+			var u = d.Users.FirstOrDefault(x => x.Id == userId);
+			if (u is null) return;
+			d.Users.Remove(u);
+			found = true;
+		});
+		return found;
+	}
+
+	public bool AddUserAlias(string id, UserAlias alias)
+	{
+		bool found = false;
+		Mutate(list =>
+		{
+			var d = list.FirstOrDefault(x => x.Id == id);
+			if (d is null) return;
+			d.UserAliases.RemoveAll(a => a.Alias == alias.Alias);
+			d.UserAliases.Add(alias);
+			found = true;
+		});
+		return found;
+	}
+
+	public bool RemoveUserAlias(string id, string alias)
+	{
+		bool found = false;
+		Mutate(list =>
+		{
+			var d = list.FirstOrDefault(x => x.Id == id);
+			if (d is null) return;
+			d.UserAliases.RemoveAll(a => a.Alias == alias);
+			found = true;
+		});
+		return found;
+	}
+
+	public bool AddEmailList(string id, EmailList emailList)
+	{
+		bool found = false;
+		Mutate(list =>
+		{
+			var d = list.FirstOrDefault(x => x.Id == id);
+			if (d is null) return;
+			d.EmailLists.Add(emailList);
+			found = true;
+		});
+		return found;
+	}
+
+	public bool RemoveEmailList(string id, string listId)
+	{
+		bool found = false;
+		Mutate(list =>
+		{
+			var d = list.FirstOrDefault(x => x.Id == id);
+			if (d is null) return;
+			d.EmailLists.RemoveAll(l => l.Id == listId);
+			found = true;
+		});
+		return found;
+	}
+
+	public bool AddListMember(string id, string listId, string member)
+	{
+		bool found = false;
+		Mutate(list =>
+		{
+			var d = list.FirstOrDefault(x => x.Id == id);
+			var l = d?.EmailLists.FirstOrDefault(x => x.Id == listId);
+			if (l is null) return;
+			var m = member.Trim().ToLowerInvariant();
+			if (!l.Members.Contains(m)) l.Members.Add(m);
+			found = true;
+		});
+		return found;
+	}
+
+	public bool RemoveListMember(string id, string listId, string member)
+	{
+		bool found = false;
+		Mutate(list =>
+		{
+			var d = list.FirstOrDefault(x => x.Id == id);
+			var l = d?.EmailLists.FirstOrDefault(x => x.Id == listId);
+			if (l is null) return;
+			l.Members.Remove(member.Trim().ToLowerInvariant());
+			found = true;
+		});
+		return found;
+	}
+
 	private static string Norm(string s) => s.Trim().ToLowerInvariant();
 
 	private void Mutate(Action<List<DomainConfig>> action)

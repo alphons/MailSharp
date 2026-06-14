@@ -11,9 +11,13 @@ function esc(str)
 
 async function apiFetch(url, data, method)
 {
-	const opts = data
-		? { method: method ?? 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }
-		: { method: 'GET' };
+	let opts;
+	if (method === 'DELETE')
+		opts = { method: 'DELETE' };
+	else if (data != null)
+		opts = { method: method ?? 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) };
+	else
+		opts = { method: method ?? 'GET' };
 	const res = await fetch(url, opts);
 	if (!res.ok) throw new Error(`HTTP ${res.status}`);
 	const ct = res.headers.get('content-type') ?? '';
@@ -284,6 +288,10 @@ function buildCfgSmtp(s, dmarc, mailbox)
 		${field('smtp-relayhost',  'Remote host name',   s.relayHost)}
 		${field('smtp-relayport',  'Remote TCP/IP port', s.relayPort, 'number')}
 		${field('smtp-relayqueue', 'Relay queue path',   s.relayQueuePath)}
+		<div class="form-field">
+			<label for="smtp-relaysec">Connection security</label>
+			<select id="smtp-relaysec">${secOpts}</select>
+		</div>
 	</div>
 	<div class="toggle-list">
 		${toggle('smtp-relayauth', 'Server requires authentication', 'Authenticate when relaying', s.relayRequiresAuth)}
@@ -291,10 +299,6 @@ function buildCfgSmtp(s, dmarc, mailbox)
 	<div class="form-grid">
 		${field('smtp-relayuser', 'User name', s.relayUsername)}
 		${field('smtp-relaypass', 'Password',  s.relayPassword, 'password')}
-	</div>
-	<div class="form-field">
-		<label for="smtp-relaysec">Connection security</label>
-		<select id="smtp-relaysec">${secOpts}</select>
 	</div>
 
 	<div class="cfg-section-title">RFC compliance</div>
@@ -688,7 +692,7 @@ function fmtDate(iso)
 let _domains = [];
 const _openSections = {};   // id → active sub-tab name
 
-const DOM_TABS = ['Users', 'User Aliases', 'Email Lists', 'Limits', 'DKIM', 'Domein-aliases', 'Advanced'];
+const DOM_TABS = ['General', 'Users', 'User Aliases', 'Email Lists', 'Limits', 'DKIM', 'Domein-aliases'];
 
 function initDomains()
 {
@@ -722,22 +726,25 @@ function initDomains()
 function domListClick(e)
 {
 	const t = e.target;
+	const id = t.dataset.id;
 
-	if (t.dataset.action === 'delete-domain')  { deleteDomain(t.dataset.id); return; }
-	if (t.dataset.action === 'toggle-expand' || t.classList.contains('dom-card__header')) { toggleExpand(t.dataset.id ?? t.closest('.dom-card')?.id?.replace('dom-card-','')); return; }
-	if (t.classList.contains('dom-name-input')) { const id = t.closest('.dom-card')?.id?.replace('dom-card-',''); if (id && !_openSections[id]) toggleExpand(id); return; }
-	if (t.dataset.action === 'sub-tab')        { setSubTab(t.dataset.id, t.dataset.tab); return; }
-	if (t.dataset.action === 'save-domain')    { saveDomain(t.dataset.id); return; }
-	if (t.dataset.action === 'add-alias')      { addTag(t.dataset.id, 'aliases', `dom-alias-input-${t.dataset.id}`); return; }
-	if (t.dataset.action === 'remove-alias')   { removeTag(t.dataset.id, 'aliases', t.dataset.value); return; }
-	if (t.dataset.action === 'add-ualias')     { addUserAlias(t.dataset.id); return; }
-	if (t.dataset.action === 'remove-ualias')  { removeUserAlias(t.dataset.id, t.dataset.idx); return; }
-	if (t.dataset.action === 'add-list')       { addEmailList(t.dataset.id); return; }
-	if (t.dataset.action === 'remove-list')    { removeEmailList(t.dataset.id, t.dataset.listid); return; }
-	if (t.dataset.action === 'add-list-member'){ addListMember(t.dataset.id, t.dataset.listid); return; }
-	if (t.dataset.action === 'remove-list-member') { removeListMember(t.dataset.id, t.dataset.listid, t.dataset.value); return; }
-	if (t.dataset.action === 'add-user')       { addDomainUser(t.dataset.id); return; }
-	if (t.dataset.action === 'remove-user')    { removeDomainUser(t.dataset.id, t.dataset.userid); return; }
+	if (t.dataset.action === 'delete-domain')       { deleteDomain(id); return; }
+	if (t.dataset.action === 'toggle-expand')        { toggleExpand(id ?? t.closest('.dom-card')?.id?.replace('dom-card-','')); return; }
+	if (t.dataset.action === 'sub-tab')              { setSubTab(id, t.dataset.tab); return; }
+	if (t.dataset.action === 'save-general')         { saveGeneral(id); return; }
+	if (t.dataset.action === 'save-limits')          { saveLimits(id); return; }
+	if (t.dataset.action === 'save-dkim')            { saveDkim(id); return; }
+	if (t.dataset.action === 'add-alias')            { apiAddAlias(id); return; }
+	if (t.dataset.action === 'remove-alias')         { apiRemoveAlias(id, t.dataset.value); return; }
+	if (t.dataset.action === 'add-ualias')           { apiAddUserAlias(id); return; }
+	if (t.dataset.action === 'remove-ualias')        { apiRemoveUserAlias(id, t.dataset.alias); return; }
+	if (t.dataset.action === 'add-list')             { apiAddList(id); return; }
+	if (t.dataset.action === 'remove-list')          { apiRemoveList(id, t.dataset.listid); return; }
+	if (t.dataset.action === 'add-list-member')      { apiAddListMember(id, t.dataset.listid); return; }
+	if (t.dataset.action === 'remove-list-member')   { apiRemoveListMember(id, t.dataset.listid, t.dataset.value); return; }
+	if (t.dataset.action === 'add-user')             { apiAddUser(id); return; }
+	if (t.dataset.action === 'save-user')            { apiSaveUser(id, t.dataset.userid); return; }
+	if (t.dataset.action === 'remove-user')          { apiRemoveUser(id, t.dataset.userid); return; }
 }
 
 function domListChange(e)
@@ -746,7 +753,15 @@ function domListChange(e)
 	if (t.dataset.action === 'toggle-enabled')
 	{
 		const d = _domains.find(x => x.id === t.dataset.id);
-		if (d) { d.enabled = t.checked; saveDomain(d.id); }
+		if (!d) return;
+		d.enabled = t.checked;
+		const dot = $id(`dom-dot-${d.id}`);
+		if (dot)
+		{
+			dot.classList.toggle('dom-status--on',  d.enabled);
+			dot.classList.toggle('dom-status--off', !d.enabled);
+		}
+		saveGeneral(d.id);
 	}
 }
 
@@ -754,11 +769,11 @@ function domListKeydown(e)
 {
 	if (e.key !== 'Enter') return;
 	const t = e.target;
-	if (t.dataset.enter === 'add-alias')   { addTag(t.dataset.id, 'aliases', t.id); return; }
-	if (t.dataset.enter === 'add-user')    { addDomainUser(t.dataset.id); return; }
-	if (t.dataset.enter === 'add-ualias')  { addUserAlias(t.dataset.id); return; }
-	if (t.dataset.enter === 'add-list')    { addEmailList(t.dataset.id); return; }
-	if (t.dataset.enter === 'add-lmember') { addListMember(t.dataset.id, t.dataset.listid); return; }
+	if (t.dataset.enter === 'add-alias')   { apiAddAlias(t.dataset.id); return; }
+	if (t.dataset.enter === 'add-user')    { apiAddUser(t.dataset.id); return; }
+	if (t.dataset.enter === 'add-ualias')  { apiAddUserAlias(t.dataset.id); return; }
+	if (t.dataset.enter === 'add-list')    { apiAddList(t.dataset.id); return; }
+	if (t.dataset.enter === 'add-lmember') { apiAddListMember(t.dataset.id, t.dataset.listid); return; }
 }
 
 // ── Load / render ──────────────────────────────────────────
@@ -791,22 +806,18 @@ function domainCard(d)
 		<div class="dom-subtab-nav">${tabBar}</div>
 		<div class="dom-subtab-body">
 			${buildSubTab(d, activeTab)}
-		</div>
-		<div class="dom-card__footer">
-			<button class="btn-save" data-action="save-domain" data-id="${esc(d.id)}">Save</button>
-			<span class="save-msg" id="dom-msg-${esc(d.id)}"></span>
 		</div>` : '';
 
 	return `
 	<div class="dom-card${open ? ' dom-card--open' : ''}" id="dom-card-${esc(d.id)}">
-		<div class="dom-card__header" data-action="toggle-expand" data-id="${esc(d.id)}" style="cursor:pointer" title="${open ? 'Collapse' : 'Expand'}">
-			<span class="dom-status-dot ${statusCls}"></span>
-			<input type="text" class="dom-name-input" id="dom-name-${esc(d.id)}" value="${esc(d.name)}" placeholder="domain.tld">
+		<div class="dom-card__header" data-action="toggle-expand" data-id="${esc(d.id)}">
+			<span class="dom-status-dot ${statusCls}" id="dom-dot-${esc(d.id)}"></span>
+			<span class="dom-name-label" data-action="toggle-expand" data-id="${esc(d.id)}" id="dom-label-${esc(d.id)}">${esc(d.name)}</span>
 			<label class="toggle" title="Enable / disable domain" onclick="event.stopPropagation()">
 				<input type="checkbox" data-action="toggle-enabled" data-id="${esc(d.id)}"${d.enabled ? ' checked' : ''}>
 				<span class="toggle-track"></span>
 			</label>
-			<button class="dom-delete-btn" data-action="delete-domain" data-id="${esc(d.id)}" title="Delete domain" onclick="event.stopPropagation()">&times;</button>
+			<button class="dom-delete-btn" data-action="delete-domain" data-id="${esc(d.id)}" title="Delete domain">&times;</button>
 		</div>
 		${body}
 	</div>`;
@@ -816,15 +827,47 @@ function buildSubTab(d, tab)
 {
 	switch (tab)
 	{
-		case 'Domein-aliases': return buildAliasesTab(d);
+		case 'General':        return buildGeneralTab(d);
 		case 'Users':          return buildUsersTab(d);
-		case 'User Aliases': return buildUserAliasesTab(d);
-		case 'Email Lists':  return buildEmailListsTab(d);
-		case 'Limits':       return buildLimitsTab(d);
-		case 'DKIM':         return buildDkimTab(d);
-		case 'Advanced':     return buildAdvancedTab(d);
+		case 'User Aliases':   return buildUserAliasesTab(d);
+		case 'Email Lists':    return buildEmailListsTab(d);
+		case 'Limits':         return buildLimitsTab(d);
+		case 'DKIM':           return buildDkimTab(d);
+		case 'Domein-aliases': return buildAliasesTab(d);
 		default: return '';
 	}
+}
+
+function tabFooter(domainId, action, label)
+{
+	return `<div class="dom-tab-footer">
+		<button class="btn-save" data-action="${action}" data-id="${esc(domainId)}">${label}</button>
+		<span class="save-msg" id="dom-msg-${esc(domainId)}-${action}"></span>
+	</div>`;
+}
+
+function tabMsg(domainId, action) { return $id(`dom-msg-${domainId}-${action}`); }
+
+// ── Sub-tab: General ───────────────────────────────────────
+
+function buildGeneralTab(d)
+{
+	return `
+	<div class="form-grid">
+		<div class="form-field">
+			<label for="gen-name-${esc(d.id)}">Domain name</label>
+			<input type="text" class="dom-input" id="gen-name-${esc(d.id)}" value="${esc(d.name)}" placeholder="domain.tld"
+				data-labelfor="${esc(d.id)}" oninput="domNameInput(this)">
+		</div>
+		<div class="form-field">
+			<label>Catch-all address</label>
+			<div class="dom-catchall-row">
+				<input type="text" class="dom-input" id="gen-catchall-${esc(d.id)}" value="${esc(d.catchAll ?? '')}" placeholder="username">
+				<span class="dom-catchall-suffix" id="gen-catchall-suffix-${esc(d.id)}">@${esc(d.name)}</span>
+			</div>
+		</div>
+	</div>
+	${tabFooter(d.id, 'save-general', 'Save')}`;
 }
 
 // ── Sub-tab: Aliases ───────────────────────────────────────
@@ -836,13 +879,13 @@ function buildAliasesTab(d)
 			<button class="dom-alias-remove" data-action="remove-alias" data-id="${esc(d.id)}" data-value="${esc(a)}">&times;</button>
 		</span>`).join('');
 	return `
-	<div class="cfg-section-title">Domain aliases</div>
 	<p class="dom-hint">Other domain names that resolve to this domain.</p>
 	<div class="dom-alias-tags" id="dom-alias-tags-${esc(d.id)}">${tags || '<span class="dom-hint">None</span>'}</div>
 	<div class="dom-alias-add-row">
 		<input type="text" class="dom-input" id="dom-alias-input-${esc(d.id)}"
 			placeholder="alias.tld" data-enter="add-alias" data-id="${esc(d.id)}">
-		<button class="btn-add-port" data-action="add-alias" data-id="${esc(d.id)}">+ Add alias</button>
+		<button class="btn-add-port" data-action="add-alias" data-id="${esc(d.id)}">+ Add</button>
+		<span class="save-msg" id="dom-msg-${esc(d.id)}-alias"></span>
 	</div>`;
 }
 
@@ -888,8 +931,11 @@ function buildUsersTab(d)
 			</td>
 			<td class="usr-stat">${lastActive}</td>
 			<td class="usr-stat">${sizeMb}</td>
-			<td><button class="dom-delete-btn" data-action="remove-user"
-				data-id="${esc(d.id)}" data-userid="${esc(u.id)}">&times;</button></td>
+			<td class="usr-actions">
+				<button class="btn-row-save" data-action="save-user" data-id="${esc(d.id)}" data-userid="${esc(u.id)}" title="Save">&#10003;</button>
+				<button class="dom-delete-btn" data-action="remove-user" data-id="${esc(d.id)}" data-userid="${esc(u.id)}" title="Delete">&times;</button>
+				<span class="save-msg" id="usr-msg-${esc(u.id)}"></span>
+			</td>
 		</tr>`;
 	}).join('');
 
@@ -938,29 +984,41 @@ function buildUsersTab(d)
 
 function buildUserAliasesTab(d)
 {
-	const rows = (d.userAliases || []).map((ua, i) => `
+	const domSuffix = `@${esc(d.name)}`;
+	const localPart = v => v ? v.replace(/@.*$/, '') : v;
+	const listId    = `ua-users-${esc(d.id)}`;
+	const userOpts  = (d.users || []).map(u => `<option value="${esc(u.username)}">`).join('');
+	const datalist  = `<datalist id="${listId}">${userOpts}</datalist>`;
+
+	const targetInput = (id, value) =>
+		`<div class="ua-target-row">
+			<input type="text" class="dom-input" id="${id}" value="${esc(value)}" placeholder="username" list="${listId}">
+			<span class="ua-domain-suffix">${domSuffix}</span>
+		</div>`;
+
+	const rows = (d.userAliases || []).map(ua => `
 		<tr>
-			<td><input type="text" class="dom-input" id="ua-alias-${esc(d.id)}-${i}" value="${esc(ua.alias)}" placeholder="alias"></td>
+			<td class="dom-input-cell">${esc(ua.alias)}</td>
 			<td style="padding:0 8px;color:var(--text-muted)">→</td>
-			<td><input type="text" class="dom-input" id="ua-target-${esc(d.id)}-${i}" value="${esc(ua.target)}" placeholder="target@example.com"></td>
-			<td><button class="dom-delete-btn" data-action="remove-ualias" data-id="${esc(d.id)}" data-idx="${i}">&times;</button></td>
+			<td class="dom-input-cell">${esc(localPart(ua.target))}<span class="ua-domain-suffix">${domSuffix}</span></td>
+			<td><button class="dom-delete-btn" data-action="remove-ualias" data-id="${esc(d.id)}" data-alias="${esc(ua.alias)}">&times;</button></td>
 		</tr>`).join('');
 
 	return `
-	<div class="cfg-section-title">User aliases</div>
+	${datalist}
 	<p class="dom-hint">Map an alias address to another mailbox.</p>
 	<table class="dom-table" id="ua-table-${esc(d.id)}">
-		<thead><tr><th>Alias (local part)</th><th></th><th>Target address</th><th></th></tr></thead>
-		<tbody>${rows}</tbody>
+		<thead><tr><th>Alias</th><th></th><th>Target</th><th></th></tr></thead>
+		<tbody>${rows || `<tr><td colspan="4" class="dom-hint" style="padding:8px">No aliases yet.</td></tr>`}</tbody>
 	</table>
-	<div class="dom-alias-add-row" style="margin-top:8px">
+	<div class="ua-add-row">
 		<input type="text" class="dom-input" id="ua-new-alias-${esc(d.id)}" placeholder="alias"
 			data-enter="add-ualias" data-id="${esc(d.id)}">
-		<span style="color:var(--text-muted);padding:0 6px">→</span>
-		<input type="text" class="dom-input" id="ua-new-target-${esc(d.id)}" placeholder="target@example.com"
-			data-enter="add-ualias" data-id="${esc(d.id)}">
-		<button class="btn-add-port" data-action="add-ualias" data-id="${esc(d.id)}">+ Add</button>
-	</div>`;
+		<span style="color:var(--text-muted);text-align:center">→</span>
+		${targetInput(`ua-new-target-${esc(d.id)}`, '')}
+		<button class="btn-add-port" data-action="add-ualias" data-id="${esc(d.id)}" title="Add">+</button>
+	</div>
+	<div style="margin-top:4px"><span class="save-msg" id="dom-msg-${esc(d.id)}-ualias"></span></div>`;
 }
 
 // ── Sub-tab: Email Lists ───────────────────────────────────
@@ -1006,14 +1064,22 @@ function buildLimitsTab(d)
 {
 	const lim = d.limits || {};
 	return `
-	<div class="cfg-section-title">Storage limits</div>
-	<div class="form-grid">
-		${field(`lim-mailbox-${d.id}`,  'Max mailbox size (KB)',              lim.maxMailboxSizeKb  ?? 0, 'number')}
-		${field(`lim-allocated-${d.id}`,'Total allocated storage (KB)',       lim.allocatedSizeKb   ?? 0, 'number')}
-		${field(`lim-msgsize-${d.id}`,  'Max message size (KB)',              lim.maxMessageSizeKb  ?? 0, 'number')}
-		${field(`lim-accounts-${d.id}`, 'Max total size all accounts (KB)',   lim.maxAccountsSizeKb ?? 0, 'number')}
+	<div class="form-grid form-grid--narrow">
+		${field(`lim-mailbox-${d.id}`,  'Max mailbox (KB)',     lim.maxMailboxSizeKb  ?? 0, 'number')}
+		${field(`lim-allocated-${d.id}`,'Allocated (KB)',        lim.allocatedSizeKb   ?? 0, 'number')}
+		${field(`lim-msgsize-${d.id}`,  'Max message (KB)',      lim.maxMessageSizeKb  ?? 0, 'number')}
+		${field(`lim-accounts-${d.id}`, 'All accounts (KB)',     lim.maxAccountsSizeKb ?? 0, 'number')}
 	</div>
-	<p class="dom-hint">0 = unlimited.</p>`;
+	<p class="dom-hint">0 = unlimited.</p>
+	${tabFooter(d.id, 'save-limits', 'Save')}`;
+}
+
+function dkimKeyFilePicked(picker, textId)
+{
+	const file = picker.files[0];
+	if (!file) return;
+	const el = $id(textId);
+	if (el) el.value = file.name;
 }
 
 // ── Sub-tab: DKIM ──────────────────────────────────────────
@@ -1032,9 +1098,20 @@ function buildDkimTab(d)
 	<div class="toggle-list">
 		${toggle(`dkim-enabled-${d.id}`, 'Enable DKIM signing', 'Sign outgoing messages with DKIM', dk.enabled ?? false)}
 	</div>
-	<div class="form-grid">
-		${field(`dkim-keyfile-${d.id}`,  'Private key file',  dk.privateKeyFile ?? '')}
-		${field(`dkim-selector-${d.id}`, 'Selector',          dk.selector       ?? '')}
+	<div class="form-grid form-grid--dkim">
+		<div class="form-field">
+			<label for="dkim-keyfile-${esc(d.id)}">Private key file</label>
+			<div class="file-picker-row">
+				<input type="text" id="dkim-keyfile-${esc(d.id)}" value="${esc(dk.privateKeyFile ?? '')}" placeholder="path/to/private.key">
+				<input type="file" id="dkim-keyfile-picker-${esc(d.id)}" accept=".pem,.key,.p8,.der" style="display:none"
+					onchange="dkimKeyFilePicked(this, 'dkim-keyfile-${esc(d.id)}')">
+				<button type="button" class="btn-browse" onclick="$id('dkim-keyfile-picker-${esc(d.id)}').click()">Browse&hellip;</button>
+			</div>
+		</div>
+		<div class="form-field dkim-selector-field">
+			<label for="dkim-selector-${esc(d.id)}">Selector</label>
+			<input type="text" id="dkim-selector-${esc(d.id)}" value="${esc(dk.selector ?? '')}" placeholder="mail">
+		</div>
 	</div>
 	<div class="form-grid">
 		<div class="form-field">
@@ -1049,66 +1126,8 @@ function buildDkimTab(d)
 			<label for="dkim-algo-${esc(d.id)}">Signing algorithm</label>
 			<select id="dkim-algo-${esc(d.id)}">${aOpts}</select>
 		</div>
-	</div>`;
-}
-
-// ── Sub-tab: Advanced ──────────────────────────────────────
-
-function buildAdvancedTab(d)
-{
-	return `
-	<div class="cfg-section-title">Catch-all</div>
-	<p class="dom-hint">All mail to unknown addresses on this domain is delivered here.</p>
-	<div class="form-grid">
-		<div class="form-field">
-			<label>Catch-all address</label>
-			<div class="dom-catchall-row">
-				<input type="text" class="dom-input" id="adv-catchall-${esc(d.id)}" value="${esc(d.catchAll ?? '')}" placeholder="username">
-				<span class="dom-catchall-suffix">@${esc(d.name)}</span>
-			</div>
-		</div>
-	</div>`;
-}
-
-// ── Collect helpers ────────────────────────────────────────
-
-function collectDomain(d)
-{
-	const id = d.id;
-	return {
-		id:      d.id,
-		name:    $id(`dom-name-${id}`)?.value.trim()    || d.name,
-		enabled: d.enabled,
-		aliases: d.aliases,
-		users:       collectUsers(d),
-		userAliases: collectUserAliases(d),
-		emailLists:  d.emailLists,
-		limits:      collectLimits(d),
-		dkim:        collectDkim(d),
-		catchAll:    $id(`adv-catchall-${id}`)?.value.trim() ?? d.catchAll
-	};
-}
-
-function collectUsers(d)
-{
-	return (d.users || []).map(u => ({
-		id:        u.id,
-		username:  $id(`usr-name-${u.id}`)?.value.trim()   ?? u.username,
-		password:  $id(`usr-pass-${u.id}`)?.value          ?? u.password,
-		maxSizeMb: parseInt($id(`usr-max-${u.id}`)?.value) || 0
-	}));
-}
-
-function collectUserAliases(d)
-{
-	const rows = [];
-	(d.userAliases || []).forEach((_, i) =>
-	{
-		const alias  = $id(`ua-alias-${d.id}-${i}`)?.value.trim();
-		const target = $id(`ua-target-${d.id}-${i}`)?.value.trim();
-		if (alias && target) rows.push({ alias, target });
-	});
-	return rows;
+	</div>
+	${tabFooter(d.id, 'save-dkim', 'Save')}`;
 }
 
 function collectLimits(d)
@@ -1133,21 +1152,29 @@ function collectDkim(d)
 	};
 }
 
+function domNameInput(input)
+{
+	const id = input.dataset.labelfor;
+	const label  = $id(`dom-label-${id}`);
+	const suffix = $id(`gen-catchall-suffix-${id}`);
+	if (label)  label.textContent  = input.value || input.placeholder;
+	if (suffix) suffix.textContent = `@${input.value || input.placeholder}`;
+}
+
 // ── Actions ────────────────────────────────────────────────
 
 function toggleExpand(id)
 {
 	if (_openSections[id]) { delete _openSections[id]; renderDomains(); return; }
-	_openSections[id] = 'Aliases';
+	_openSections[id] = 'General';
 	renderDomains();
 }
 
 function setSubTab(id, tab)
 {
-	const d = _domains.find(x => x.id === id);
-	if (d) mergeCollected(d);
 	_openSections[id] = tab;
 	renderDomains();
+	const d = _domains.find(x => x.id === id);
 	if (tab === 'Users' && d) loadUserStats(d);
 }
 
@@ -1164,32 +1191,53 @@ async function loadUserStats(d)
 	catch { /* stats are optional */ }
 }
 
-function mergeCollected(d)
-{
-	const tab = _openSections[d.id];
-	if (!tab) return;
-	if (tab === 'Users')        d.users        = collectUsers(d);
-	if (tab === 'User Aliases') d.userAliases  = collectUserAliases(d);
-	if (tab === 'Limits')       d.limits       = collectLimits(d);
-	if (tab === 'DKIM')         d.dkim         = collectDkim(d);
-	if (tab === 'Advanced')     d.catchAll     = $id(`adv-catchall-${d.id}`)?.value.trim() ?? d.catchAll;
-	const nameEl = $id(`dom-name-${d.id}`);
-	if (nameEl) d.name = nameEl.value.trim() || d.name;
-}
-
-async function saveDomain(id)
+async function saveGeneral(id)
 {
 	const d = _domains.find(x => x.id === id);
 	if (!d) return;
-	mergeCollected(d);
-	const payload = collectDomain(d);
+	const name    = $id(`gen-name-${id}`)?.value.trim()    || d.name;
+	const catchAll = $id(`gen-catchall-${id}`)?.value.trim() ?? d.catchAll;
+	const msg = tabMsg(id, 'save-general');
 	try
 	{
-		await apiFetch(`/api/domain/${id}`, payload, 'PUT');
-		Object.assign(d, payload);
-		showMsg($id(`dom-msg-${id}`), true, 'Saved');
+		await apiFetch(`/api/domain/${id}/general`, { name, enabled: d.enabled, catchAll }, 'PUT');
+		d.name    = name;
+		d.catchAll = catchAll;
+		const label = $id(`dom-label-${id}`);
+		if (label) label.textContent = name;
+		showMsg(msg, true, 'Saved');
 	}
-	catch (e) { showMsg($id(`dom-msg-${id}`), false, e.message || 'Error'); }
+	catch (e) { showMsg(msg, false, e.message || 'Error'); }
+}
+
+async function saveLimits(id)
+{
+	const d = _domains.find(x => x.id === id);
+	if (!d) return;
+	const limits = collectLimits(d);
+	const msg = tabMsg(id, 'save-limits');
+	try
+	{
+		await apiFetch(`/api/domain/${id}/limits`, limits, 'PUT');
+		d.limits = limits;
+		showMsg(msg, true, 'Saved');
+	}
+	catch (e) { showMsg(msg, false, e.message || 'Error'); }
+}
+
+async function saveDkim(id)
+{
+	const d = _domains.find(x => x.id === id);
+	if (!d) return;
+	const dkim = collectDkim(d);
+	const msg = tabMsg(id, 'save-dkim');
+	try
+	{
+		await apiFetch(`/api/domain/${id}/dkim`, dkim, 'PUT');
+		d.dkim = dkim;
+		showMsg(msg, true, 'Saved');
+	}
+	catch (e) { showMsg(msg, false, e.message || 'Error'); }
 }
 
 async function deleteDomain(id)
@@ -1206,117 +1254,181 @@ async function deleteDomain(id)
 	catch (e) { showMsg($id('msg-domains'), false, e.message || 'Error'); }
 }
 
-// ── Tag helpers ────────────────────────────────────────────
+// ── Per-item API helpers ───────────────────────────────────
 
-function addTag(domainId, field_, inputId)
+async function apiAddAlias(domainId)
 {
 	const d     = _domains.find(x => x.id === domainId);
-	const input = $id(inputId);
-	if (!d || !input) return;
-	const val = input.value.trim().toLowerCase();
-	if (!val || d[field_].includes(val)) { input.value = ''; return; }
-	d[field_] = [...d[field_], val];
-	input.value = '';
-	renderDomains();
+	const input = $id(`dom-alias-input-${domainId}`);
+	const val   = input?.value.trim().toLowerCase();
+	const msg   = $id(`dom-msg-${domainId}-alias`);
+	if (!d || !val) return;
+	try
+	{
+		await apiFetch(`/api/domain/${domainId}/aliases`, { value: val }, 'POST');
+		if (!d.aliases.includes(val)) d.aliases.push(val);
+		input.value = '';
+		renderDomains();
+	}
+	catch (e) { showMsg(msg, false, e.message || 'Error'); }
 }
 
-function removeTag(domainId, field_, value)
+async function apiRemoveAlias(domainId, alias)
 {
 	const d = _domains.find(x => x.id === domainId);
 	if (!d) return;
-	d[field_] = d[field_].filter(v => v !== value);
-	renderDomains();
+	try
+	{
+		await apiFetch(`/api/domain/${domainId}/aliases/${encodeURIComponent(alias)}`, null, 'DELETE');
+		d.aliases = d.aliases.filter(a => a !== alias);
+		renderDomains();
+	}
+	catch (e) { console.error(e); }
 }
 
-// ── Domain user helpers ────────────────────────────────────
-
-function addDomainUser(domainId)
+async function apiAddUser(domainId)
 {
-	const d        = _domains.find(x => x.id === domainId);
-	const username = $id(`usr-new-name-${domainId}`)?.value.trim().toLowerCase();
-	const password = $id(`usr-new-pass-${domainId}`)?.value;
+	const d         = _domains.find(x => x.id === domainId);
+	const username  = $id(`usr-new-name-${domainId}`)?.value.trim().toLowerCase();
+	const password  = $id(`usr-new-pass-${domainId}`)?.value;
 	const maxSizeMb = parseInt($id(`usr-new-max-${domainId}`)?.value) || 0;
 	if (!d || !username || !password) return;
-	d.users = collectUsers(d);
-	d.users.push({ id: crypto.randomUUID(), username, password, maxSizeMb });
-	$id(`usr-new-name-${domainId}`).value = '';
-	$id(`usr-new-pass-${domainId}`).value = '';
-	$id(`usr-new-max-${domainId}`).value  = '';
-	renderDomains();
+	try
+	{
+		const created = await apiFetch(`/api/domain/${domainId}/users`, { username, password, maxSizeMb }, 'POST');
+		d.users.push(created);
+		$id(`usr-new-name-${domainId}`).value = '';
+		$id(`usr-new-pass-${domainId}`).value = '';
+		$id(`usr-new-max-${domainId}`).value  = '';
+		renderDomains();
+	}
+	catch (e) { console.error(e); }
 }
 
-function removeDomainUser(domainId, userId)
+async function apiSaveUser(domainId, userId)
+{
+	const d = _domains.find(x => x.id === domainId);
+	const u = d?.users?.find(x => x.id === userId);
+	if (!u) return;
+	const username  = $id(`usr-name-${userId}`)?.value.trim().toLowerCase() || u.username;
+	const password  = $id(`usr-pass-${userId}`)?.value || u.password;
+	const maxSizeMb = parseInt($id(`usr-max-${userId}`)?.value) || 0;
+	const msg = $id(`usr-msg-${userId}`);
+	try
+	{
+		await apiFetch(`/api/domain/${domainId}/users/${userId}`, { id: userId, username, password, maxSizeMb }, 'PUT');
+		u.username  = username;
+		u.password  = password;
+		u.maxSizeMb = maxSizeMb;
+		showMsg(msg, true, 'Saved');
+	}
+	catch (e) { showMsg(msg, false, e.message || 'Error'); }
+}
+
+async function apiRemoveUser(domainId, userId)
 {
 	if (!confirm('Remove this user?')) return;
 	const d = _domains.find(x => x.id === domainId);
 	if (!d) return;
-	d.users = collectUsers(d).filter(u => u.id !== userId);
-	renderDomains();
+	try
+	{
+		await apiFetch(`/api/domain/${domainId}/users/${userId}`, null, 'DELETE');
+		d.users = d.users.filter(u => u.id !== userId);
+		renderDomains();
+	}
+	catch (e) { console.error(e); }
 }
 
-// ── User alias helpers ─────────────────────────────────────
-
-function addUserAlias(domainId)
+async function apiAddUserAlias(domainId)
 {
-	const d      = _domains.find(x => x.id === domainId);
-	const alias  = $id(`ua-new-alias-${domainId}`)?.value.trim();
-	const target = $id(`ua-new-target-${domainId}`)?.value.trim();
+	const d     = _domains.find(x => x.id === domainId);
+	const alias = $id(`ua-new-alias-${domainId}`)?.value.trim();
+	const local = $id(`ua-new-target-${domainId}`)?.value.trim();
+	const target = local ? `${local}@${d?.name}` : '';
+	const msg   = $id(`dom-msg-${domainId}-ualias`);
 	if (!d || !alias || !target) return;
-	d.userAliases = collectUserAliases(d);
-	d.userAliases.push({ alias, target });
-	$id(`ua-new-alias-${domainId}`).value  = '';
-	$id(`ua-new-target-${domainId}`).value = '';
-	renderDomains();
+	try
+	{
+		await apiFetch(`/api/domain/${domainId}/useraliases`, { alias, target }, 'POST');
+		d.userAliases = d.userAliases.filter(a => a.alias !== alias);
+		d.userAliases.push({ alias, target });
+		$id(`ua-new-alias-${domainId}`).value  = '';
+		$id(`ua-new-target-${domainId}`).value = '';
+		renderDomains();
+	}
+	catch (e) { showMsg(msg, false, e.message || 'Error'); }
 }
 
-function removeUserAlias(domainId, idx)
+async function apiRemoveUserAlias(domainId, alias)
 {
 	const d = _domains.find(x => x.id === domainId);
 	if (!d) return;
-	d.userAliases = collectUserAliases(d);
-	d.userAliases.splice(parseInt(idx), 1);
-	renderDomains();
+	try
+	{
+		await apiFetch(`/api/domain/${domainId}/useraliases/${encodeURIComponent(alias)}`, null, 'DELETE');
+		d.userAliases = d.userAliases.filter(a => a.alias !== alias);
+		renderDomains();
+	}
+	catch (e) { console.error(e); }
 }
 
-// ── Email list helpers ─────────────────────────────────────
-
-function addEmailList(domainId)
+async function apiAddList(domainId)
 {
 	const d    = _domains.find(x => x.id === domainId);
 	const name = $id(`list-new-${domainId}`)?.value.trim().toLowerCase();
 	if (!d || !name) return;
-	d.emailLists = d.emailLists || [];
-	d.emailLists.push({ id: crypto.randomUUID(), name, members: [] });
-	$id(`list-new-${domainId}`).value = '';
-	renderDomains();
+	try
+	{
+		const created = await apiFetch(`/api/domain/${domainId}/lists`, { name }, 'POST');
+		d.emailLists = d.emailLists || [];
+		d.emailLists.push(created);
+		$id(`list-new-${domainId}`).value = '';
+		renderDomains();
+	}
+	catch (e) { console.error(e); }
 }
 
-function removeEmailList(domainId, listId)
+async function apiRemoveList(domainId, listId)
 {
 	const d = _domains.find(x => x.id === domainId);
 	if (!d) return;
-	d.emailLists = d.emailLists.filter(l => l.id !== listId);
-	renderDomains();
+	try
+	{
+		await apiFetch(`/api/domain/${domainId}/lists/${listId}`, null, 'DELETE');
+		d.emailLists = d.emailLists.filter(l => l.id !== listId);
+		renderDomains();
+	}
+	catch (e) { console.error(e); }
 }
 
-function addListMember(domainId, listId)
+async function apiAddListMember(domainId, listId)
 {
 	const d    = _domains.find(x => x.id === domainId);
 	const list = d?.emailLists?.find(l => l.id === listId);
 	const val  = $id(`lm-input-${listId}`)?.value.trim().toLowerCase();
-	if (!list || !val || list.members.includes(val)) return;
-	list.members.push(val);
-	$id(`lm-input-${listId}`).value = '';
-	renderDomains();
+	if (!list || !val) return;
+	try
+	{
+		await apiFetch(`/api/domain/${domainId}/lists/${listId}/members`, { value: val }, 'POST');
+		if (!list.members.includes(val)) list.members.push(val);
+		$id(`lm-input-${listId}`).value = '';
+		renderDomains();
+	}
+	catch (e) { console.error(e); }
 }
 
-function removeListMember(domainId, listId, value)
+async function apiRemoveListMember(domainId, listId, value)
 {
 	const d    = _domains.find(x => x.id === domainId);
 	const list = d?.emailLists?.find(l => l.id === listId);
 	if (!list) return;
-	list.members = list.members.filter(m => m !== value);
-	renderDomains();
+	try
+	{
+		await apiFetch(`/api/domain/${domainId}/lists/${listId}/members/${encodeURIComponent(value)}`, null, 'DELETE');
+		list.members = list.members.filter(m => m !== value);
+		renderDomains();
+	}
+	catch (e) { console.error(e); }
 }
 
 // load domains when Domains tab becomes active
