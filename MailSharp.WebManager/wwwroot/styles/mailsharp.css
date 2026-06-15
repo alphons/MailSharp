@@ -410,8 +410,9 @@ a:hover { text-decoration: underline; }
 	background: var(--text-dim);
 	transition: background var(--transition), box-shadow var(--transition);
 }
-.tab-btn.svc-up   .tab-dot { background: var(--green); box-shadow: 0 0 6px var(--green); }
-.tab-btn.svc-down .tab-dot { background: var(--red); }
+.tab-btn.svc-up       .tab-dot { background: var(--green); box-shadow: 0 0 6px var(--green); }
+.tab-btn.svc-down     .tab-dot { background: var(--red); }
+.tab-btn.svc-disabled .tab-dot { background: var(--text-dim); box-shadow: none; }
 
 .tab-panel { display: none; }
 .tab-panel.active { display: block; }
@@ -822,6 +823,39 @@ table.dom-table[id^="ua-table-"] td:last-child   { width: 32px; }
 	width: 100%;
 	outline: none;
 }
+
+/* Port row toggle */
+.port-toggle-wrap {
+	display: inline-flex;
+	align-items: center;
+	cursor: pointer;
+	position: relative;
+	width: 36px;
+	height: 20px;
+	flex-shrink: 0;
+}
+.port-toggle-wrap input { opacity: 0; width: 0; height: 0; }
+.port-toggle-track {
+	position: absolute;
+	inset: 0;
+	background: var(--surface-2);
+	border: 1px solid var(--border);
+	border-radius: 999px;
+	cursor: pointer;
+	transition: background var(--transition), border-color var(--transition);
+}
+.port-toggle-track::after {
+	content: '';
+	position: absolute;
+	top: 2px; left: 2px;
+	width: 14px; height: 14px;
+	border-radius: 50%;
+	background: var(--text-dim);
+	transition: transform var(--transition), background var(--transition);
+}
+.port-toggle-wrap input:checked + .port-toggle-track { background: var(--accent); border-color: var(--accent); }
+.port-toggle-wrap input:checked + .port-toggle-track::after { transform: translateX(16px); background: #fff; }
+.ports-table tr.port-row-disabled td { opacity: 0.45; }
 
 /* Port add/remove actions */
 .ports-actions {

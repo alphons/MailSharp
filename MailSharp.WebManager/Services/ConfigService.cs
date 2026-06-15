@@ -28,6 +28,7 @@ public class ConfigService(IWebHostEnvironment env)
 
 	private static SmtpConfigDto MakeSmtpDto(IConfiguration c) => new()
 	{
+		Enabled               = c.GetValue<bool?>("SmtpSettings:Enabled") ?? true,
 		EmlStoragePath        = c["SmtpSettings:EmlStoragePath"] ?? string.Empty,
 		CommandTimeoutSeconds = c.GetValue<int>("SmtpSettings:CommandTimeoutSeconds"),
 		BackLog               = c.GetValue<int>("SmtpSettings:BackLog"),
@@ -70,6 +71,7 @@ public class ConfigService(IWebHostEnvironment env)
 
 	private static Pop3ConfigDto MakePop3Dto(IConfiguration c) => new()
 	{
+		Enabled             = c.GetValue<bool?>("Pop3Settings:Enabled") ?? true,
 		CertificatePath     = c["Pop3Settings:CertificatePath"] ?? string.Empty,
 		CertificatePassword = c["Pop3Settings:CertificatePassword"] ?? string.Empty,
 		Ports               = c.GetSection("Pop3Settings:Ports").Get<List<PortConfigDto>>() ?? [],
@@ -79,6 +81,7 @@ public class ConfigService(IWebHostEnvironment env)
 
 	private static ImapConfigDto MakeImapDto(IConfiguration c) => new()
 	{
+		Enabled              = c.GetValue<bool?>("ImapSettings:Enabled") ?? true,
 		CertificatePath      = c["ImapSettings:CertificatePath"] ?? string.Empty,
 		CertificatePassword  = c["ImapSettings:CertificatePassword"] ?? string.Empty,
 		Ports                = c.GetSection("ImapSettings:Ports").Get<List<PortConfigDto>>() ?? [],
@@ -170,10 +173,12 @@ public class PortConfigDto
 	public string Host     { get; set; } = string.Empty;
 	public int    Port     { get; set; }
 	public string Security { get; set; } = string.Empty;
+	public bool   Enabled  { get; set; } = true;
 }
 
 public class SmtpConfigDto
 {
+	public bool         Enabled               { get; set; } = true;
 	// General
 	public string       EmlStoragePath        { get; set; } = string.Empty;
 	public int          CommandTimeoutSeconds { get; set; }
@@ -224,6 +229,7 @@ public class SmtpConfigDto
 
 public class Pop3ConfigDto
 {
+	public bool   Enabled             { get; set; } = true;
 	public string CertificatePath     { get; set; } = string.Empty;
 	public string CertificatePassword { get; set; } = string.Empty;
 	public List<PortConfigDto> Ports  { get; set; } = [];
@@ -233,6 +239,7 @@ public class Pop3ConfigDto
 
 public class ImapConfigDto
 {
+	public bool   Enabled             { get; set; } = true;
 	public string CertificatePath     { get; set; } = string.Empty;
 	public string CertificatePassword { get; set; } = string.Empty;
 	public List<PortConfigDto> Ports  { get; set; } = [];

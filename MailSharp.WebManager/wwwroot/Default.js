@@ -96,14 +96,24 @@ async function refreshServices()
 {
 	try
 	{
-		const d = await apiFetch('/api/status/all');
-		setSvcTab('tab-smtp', d.smtp);
-		setSvcTab('tab-imap', d.imap);
-		setSvcTab('tab-pop3', d.pop3);
+		const [d, cfg] = await Promise.all([apiFetch('/api/status/all'), fetchConfig()]);
+		applyServiceDot('tab-smtp', d.smtp, cfg.smtp?.enabled ?? true);
+		applyServiceDot('tab-imap', d.imap, cfg.imap?.enabled ?? true);
+		applyServiceDot('tab-pop3', d.pop3, cfg.pop3?.enabled ?? true);
 		const running = [d.smtp, d.imap, d.pop3].filter(Boolean).length;
 		$id('header-status').textContent = `${running}/3 running`;
 	}
 	catch { $id('header-status').textContent = 'unreachable'; }
+}
+
+function applyServiceDot(tabId, running, enabled)
+{
+	const el = $id(tabId);
+	if (!el) return;
+	el.classList.remove('svc-up', 'svc-down', 'svc-disabled');
+	if (!enabled)  el.classList.add('svc-disabled');
+	else if (running) el.classList.add('svc-up');
+	else           el.classList.add('svc-down');
 }
 
 async function refreshSmtp()
@@ -187,6 +197,18 @@ async function fetchConfig()
 
 function wireSettingsContainer(el)
 {
+	el.addEventListener('change', function (e)
+	{
+		const t = e.target;
+		if (t.id === 'smtp-enabled') { saveServiceEnabled('smtp', t.checked); return; }
+		if (t.id === 'pop3-enabled') { saveServiceEnabled('pop3', t.checked); return; }
+		if (t.id === 'imap-enabled') { saveServiceEnabled('imap', t.checked); return; }
+		if (t.classList.contains('port-enabled')) {
+			const row = t.closest('tr');
+			if (row) row.classList.toggle('port-row-disabled', !t.checked);
+		}
+	});
+
 	el.addEventListener('click', function (e)
 	{
 		if (e.target.classList.contains('btn-add-port'))
@@ -239,6 +261,24 @@ async function saveConfig(key)
 	}
 }
 
+async function saveServiceEnabled(svc, enabled)
+{
+	_cfg = null;
+	try
+	{
+		await saveConfig(svc);
+		// Optimistically update dot, then confirm via live status
+		const el = $id(`tab-${svc}`);
+		if (el)
+		{
+			el.classList.remove('svc-up', 'svc-down', 'svc-disabled');
+			el.classList.add(enabled ? 'svc-up' : 'svc-disabled');
+		}
+		setTimeout(refreshServices, 800);
+	}
+	catch (e) { console.error(`Failed to save ${svc} enabled:`, e); }
+}
+
 // ── SMTP panel ─────────────────────────────────────────────
 
 function buildCfgSmtp(s, dmarc, mailbox)
@@ -248,6 +288,9 @@ function buildCfgSmtp(s, dmarc, mailbox)
 	).join('');
 
 	return `
+	<div class="toggle-list">
+		${toggle('smtp-enabled', 'Enable SMTP service', 'Start the SMTP server on startup', s.enabled ?? true)}
+	</div>
 	<div class="cfg-section-title">General</div>
 	<div class="form-grid">
 		${field('smtp-emlpath',  'Email storage path',   s.emlStoragePath)}
@@ -365,6 +408,9 @@ function buildCfgSmtp(s, dmarc, mailbox)
 function buildCfgPop3(s)
 {
 	return `
+	<div class="toggle-list">
+		${toggle('pop3-enabled', 'Enable POP3 service', 'Start the POP3 server on startup', s.enabled ?? true)}
+	</div>
 	<div class="cfg-section-title">General</div>
 	<div class="form-grid">
 		${field('pop3-certpath', 'Certificate path',     s.certificatePath)}
@@ -398,6 +444,9 @@ function buildCfgImap(s)
 	).join('');
 
 	return `
+	<div class="toggle-list">
+		${toggle('imap-enabled', 'Enable IMAP service', 'Start the IMAP server on startup', s.enabled ?? true)}
+	</div>
 	<div class="cfg-section-title">General</div>
 	<div class="form-grid">
 		${field('imap-certpath', 'Certificate path',     s.certificatePath)}
@@ -453,10 +502,15 @@ function portRow(p)
 	const opts = SEC_OPTIONS.map(o =>
 		`<option value="${o.value}"${(p.security ?? 'None') === o.value ? ' selected' : ''}>${o.label}</option>`
 	).join('');
-	return `<tr>
+	const enabled = p.enabled ?? true;
+	return `<tr class="${enabled ? '' : 'port-row-disabled'}">
 		<td><input type="text"   class="port-host" value="${esc(p.host ?? '0.0.0.0')}"></td>
 		<td><input type="number" class="port-port" value="${p.port ?? ''}" min="1" max="65535"></td>
 		<td><select class="port-sec">${opts}</select></td>
+		<td><label class="port-toggle-wrap" title="${enabled ? 'Disable' : 'Enable'} this port">
+			<input type="checkbox" class="port-enabled" ${enabled ? 'checked' : ''}>
+			<span class="port-toggle-track"></span>
+		</label></td>
 		<td><button type="button" class="btn-remove-port" title="Remove">&#x2715;</button></td>
 	</tr>`;
 }
@@ -466,7 +520,7 @@ function buildPorts(prefix, ports)
 	const rows = (ports || []).map(p => portRow(p)).join('');
 	return `
 	<table class="ports-table">
-		<thead><tr><th>Host / IP</th><th>Port</th><th>Security</th><th></th></tr></thead>
+		<thead><tr><th>Host / IP</th><th>Port</th><th>Security</th><th></th><th></th></tr></thead>
 		<tbody id="${prefix}-ports-tbody">${rows}</tbody>
 	</table>
 	<div class="ports-actions">
@@ -479,6 +533,7 @@ function buildPorts(prefix, ports)
 function collectSmtp()
 {
 	return {
+		enabled:               chk('smtp-enabled'),
 		emlStoragePath:        val('smtp-emlpath'),
 		userStorePath:         val('smtp-userstore'),
 		certificatePath:       val('smtp-certpath'),
@@ -523,6 +578,7 @@ function collectSmtp()
 function collectPop3()
 {
 	return {
+		enabled:             chk('pop3-enabled'),
 		certificatePath:     val('pop3-certpath'),
 		certificatePassword: val('pop3-certpass'),
 		ports:               collectPorts('pop3'),
@@ -534,6 +590,7 @@ function collectPop3()
 function collectImap()
 {
 	return {
+		enabled:             chk('imap-enabled'),
 		certificatePath:     val('imap-certpath'),
 		certificatePassword: val('imap-certpass'),
 		ports:               collectPorts('imap'),
@@ -565,7 +622,8 @@ function collectPorts(prefix)
 	return Array.from(tbody.querySelectorAll('tr')).map(tr => ({
 		host:     tr.querySelector('.port-host')?.value ?? '',
 		port:     parseInt(tr.querySelector('.port-port')?.value) || 0,
-		security: tr.querySelector('.port-sec')?.value ?? 'None'
+		security: tr.querySelector('.port-sec')?.value ?? 'None',
+		enabled:  tr.querySelector('.port-enabled')?.checked ?? true
 	}));
 }
 
@@ -616,13 +674,6 @@ function lines(id) { return val(id).split('\n').map(s => s.trim()).filter(Boolea
 
 // ── Shared helpers ─────────────────────────────────────────
 
-function setSvcTab(tabId, up)
-{
-	const el = $id(tabId);
-	if (!el) return;
-	el.classList.remove('svc-up', 'svc-down');
-	el.classList.add(up ? 'svc-up' : 'svc-down');
-}
 
 function set(id, value)
 {
