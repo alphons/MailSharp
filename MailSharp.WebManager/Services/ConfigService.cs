@@ -7,22 +7,24 @@ public class ConfigService(IWebHostEnvironment env)
 {
 	private static readonly JsonSerializerOptions Pretty = new() { WriteIndented = true };
 
-	private string OverridePath => Path.Combine(env.ContentRootPath, "mailsharp.override.json");
+	private string OverridePath => Path.Combine(env.ContentRootPath, "mailsharp.json");
 
 	// ── Read ────────────────────────────────────────────────
 
-	public SmtpConfigDto    GetSmtp()    => MakeSmtpDto(BuildMerged());
-	public Pop3ConfigDto    GetPop3()    => MakePop3Dto(BuildMerged());
-	public ImapConfigDto    GetImap()    => MakeImapDto(BuildMerged());
-	public DmarcConfigDto   GetDmarc()   => MakeDmarcDto(BuildMerged());
-	public MailboxConfigDto GetMailbox() => MakeMailboxDto(BuildMerged());
+	public SmtpConfigDto       GetSmtp()     => MakeSmtpDto(BuildMerged());
+	public Pop3ConfigDto       GetPop3()     => MakePop3Dto(BuildMerged());
+	public ImapConfigDto       GetImap()     => MakeImapDto(BuildMerged());
+	public DmarcConfigDto      GetDmarc()    => MakeDmarcDto(BuildMerged());
+	public MailboxConfigDto    GetMailbox()  => MakeMailboxDto(BuildMerged());
+	public List<IpGroupDto>          GetIpGroups()          => MakeIpGroupsDto(BuildMerged());
+	public List<MaintenanceUserDto>  GetMaintenanceUsers()  => MakeMaintenanceUsersDto(BuildMerged());
 
 	private IConfiguration BuildMerged()
 	{
 		return new ConfigurationBuilder()
 			.SetBasePath(env.ContentRootPath)
 			.AddJsonFile("appsettings.json", optional: true)
-			.AddJsonFile("mailsharp.override.json", optional: true)
+			.AddJsonFile("mailsharp.json", optional: true)
 			.Build();
 	}
 
@@ -106,13 +108,21 @@ public class ConfigService(IWebHostEnvironment env)
 		StoragePath = c["MailboxSettings:StoragePath"] ?? string.Empty
 	};
 
+	private static List<IpGroupDto> MakeIpGroupsDto(IConfiguration c) =>
+		c.GetSection("IpGroups").Get<List<IpGroupDto>>() ?? [];
+
+	private static List<MaintenanceUserDto> MakeMaintenanceUsersDto(IConfiguration c) =>
+		c.GetSection("MaintenanceUsers").Get<List<MaintenanceUserDto>>() ?? [];
+
 	// ── Write ───────────────────────────────────────────────
 
-	public void SaveSmtp(SmtpConfigDto dto)       => PatchSection("SmtpSettings", dto);
-	public void SavePop3(Pop3ConfigDto dto)        => PatchSection("Pop3Settings", dto);
-	public void SaveImap(ImapConfigDto dto)        => PatchSection("ImapSettings", dto);
-	public void SaveDmarc(DmarcConfigDto dto)      => PatchSection("DmarcSettings", dto);
-	public void SaveMailbox(MailboxConfigDto dto)  => PatchSection("MailboxSettings", dto);
+	public void SaveSmtp(SmtpConfigDto dto)            => PatchSection("SmtpSettings", dto);
+	public void SavePop3(Pop3ConfigDto dto)             => PatchSection("Pop3Settings", dto);
+	public void SaveImap(ImapConfigDto dto)             => PatchSection("ImapSettings", dto);
+	public void SaveDmarc(DmarcConfigDto dto)           => PatchSection("DmarcSettings", dto);
+	public void SaveMailbox(MailboxConfigDto dto)       => PatchSection("MailboxSettings", dto);
+	public void SaveIpGroups(List<IpGroupDto> dto)                  => PatchSection("IpGroups", dto);
+	public void SaveMaintenanceUsers(List<MaintenanceUserDto> dto)  => PatchSection("MaintenanceUsers", dto);
 
 	private void PatchSection(string key, object dto)
 	{
@@ -153,6 +163,20 @@ public class ConfigService(IWebHostEnvironment env)
 		TrySeed("ImapSettings",    "CertificatePath", c => MakeImapDto(c));
 		TrySeed("DmarcSettings",   null,              c => MakeDmarcDto(c));
 		TrySeed("MailboxSettings", "StoragePath",     c => MakeMailboxDto(c));
+
+		if (!root.ContainsKey("MaintenanceUsers"))
+		{
+			var users = MakeMaintenanceUsersDto(src);
+			root["MaintenanceUsers"] = JsonNode.Parse(JsonSerializer.Serialize(users, Pretty))!;
+			dirty = true;
+		}
+
+		if (!root.ContainsKey("IpGroups"))
+		{
+			var groups = MakeIpGroupsDto(src);
+			root["IpGroups"] = JsonNode.Parse(JsonSerializer.Serialize(groups, Pretty))!;
+			dirty = true;
+		}
 
 		if (dirty) File.WriteAllText(OverridePath, root.ToJsonString(Pretty));
 	}
@@ -262,4 +286,47 @@ public class DmarcConfigDto
 public class MailboxConfigDto
 {
 	public string StoragePath { get; set; } = string.Empty;
+}
+
+public class IpAccessDto
+{
+	public bool Smtp                { get; set; }
+	public bool Pop3                { get; set; }
+	public bool Imap                { get; set; }
+	public bool AntiSpam            { get; set; }
+	public bool AntiVirus           { get; set; }
+	public bool RequireSslTlsForAuth { get; set; }
+}
+
+public class EmailFlowDto
+{
+	public bool Allowed     { get; set; }
+	public bool RequireAuth { get; set; }
+}
+
+public class EmailFlowsDto
+{
+	public EmailFlowDto LocalToLocal         { get; set; } = new();
+	public EmailFlowDto LocalToExternal      { get; set; } = new();
+	public EmailFlowDto ExternalToLocal      { get; set; } = new();
+	public EmailFlowDto ExternalToExternal   { get; set; } = new();
+}
+
+public class MaintenanceUserDto
+{
+	public string UserName   { get; set; } = string.Empty;
+	public string Password   { get; set; } = string.Empty;
+	public string Role       { get; set; } = "Unknown";
+	public int    ExpireDays { get; set; } = 365;
+	public bool   Enabled    { get; set; } = true;
+}
+
+public class IpGroupDto
+{
+	public string        Name       { get; set; } = string.Empty;
+	public int           Priority   { get; set; }
+	public string        Cidr       { get; set; } = string.Empty;
+	public string?       Expires    { get; set; }
+	public IpAccessDto   Access     { get; set; } = new();
+	public EmailFlowsDto EmailFlows { get; set; } = new();
 }

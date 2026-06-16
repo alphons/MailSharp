@@ -7,7 +7,7 @@ var builder = WebApplication.CreateBuilder(new WebApplicationOptions
 });
 
 builder.Configuration.AddJsonFile(
-	Path.Combine(AppContext.BaseDirectory, "mailsharp.override.json"),
+	Path.Combine(AppContext.BaseDirectory, "mailsharp.json"),
 	optional: true,
 	reloadOnChange: true);
 

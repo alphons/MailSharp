@@ -42,6 +42,12 @@
 			<button class="tab-btn" id="tab-domains" data-panel="panel-domains">
 				&#127760; Domains
 			</button>
+			<button class="tab-btn" id="tab-ipgroups" data-panel="panel-ipgroups">
+				&#128274; IP Groups
+			</button>
+			<button class="tab-btn" id="tab-maint-users" data-panel="panel-maint-users">
+				&#128100; Maintenance Users
+			</button>
 		</nav>
 
 		<!-- ── SMTP ───────────────────────────────────────── -->
@@ -258,6 +264,47 @@
 			</div>
 
 			<div id="dom-list"></div>
+
+		</div>
+
+		<!-- ── Manager Users ──────────────────────────────── -->
+		<div class="tab-panel" id="panel-maint-users">
+
+			<div class="domain-mgr-toolbar">
+				<button class="btn-save" id="mu-add-btn">+ Add user</button>
+				<span class="save-msg" id="msg-maint-users"></span>
+			</div>
+
+			<table class="ports-table mu-table" id="mu-table">
+				<thead>
+					<tr>
+						<th>Username</th>
+						<th>Password</th>
+						<th>Role</th>
+						<th>Expire days</th>
+						<th style="text-align:center">Enabled</th>
+						<th></th>
+					</tr>
+				</thead>
+				<tbody id="mu-tbody"></tbody>
+			</table>
+
+			<div class="cfg-footer" style="margin-top:12px">
+				<button class="btn-save" id="mu-save-btn">Save</button>
+				<span class="save-msg" id="mu-save-msg"></span>
+			</div>
+
+		</div>
+
+		<!-- ── IP Groups ──────────────────────────────────── -->
+		<div class="tab-panel" id="panel-ipgroups">
+
+			<div class="domain-mgr-toolbar">
+				<button class="btn-save" id="ipg-add-btn">+ Add group</button>
+				<span class="save-msg" id="msg-ipgroups"></span>
+			</div>
+
+			<div id="ipg-list"></div>
 
 		</div>
 

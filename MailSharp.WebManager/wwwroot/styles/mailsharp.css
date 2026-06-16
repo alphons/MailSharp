@@ -660,6 +660,24 @@ a:hover { text-decoration: underline; }
 }
 .cfg-section-title:first-child { margin-top: 0; }
 
+/* IP Group groupbox */
+.ipg-group {
+	border: 1px solid var(--border);
+	border-radius: var(--radius-sm);
+	padding: 12px 14px 10px;
+}
+.ipg-group__legend {
+	font-size: .75rem;
+	font-weight: 700;
+	text-transform: uppercase;
+	letter-spacing: .8px;
+	color: var(--text-muted);
+	margin-bottom: 10px;
+}
+.ipg-group .toggle-list { margin-bottom: 0; }
+.ipg-group .ports-table th,
+.ipg-group .ports-table td { padding: 6px 10px; }
+
 .cfg-restart-note {
 	font-size: .7rem;
 	color: var(--amber);

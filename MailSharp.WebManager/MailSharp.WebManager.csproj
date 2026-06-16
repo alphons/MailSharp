@@ -28,7 +28,7 @@
     <None Update="certificate.pfx">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <None Update="mailsharp.override.json">
+    <None Update="mailsharp.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>

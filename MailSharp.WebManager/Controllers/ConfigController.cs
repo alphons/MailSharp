@@ -12,11 +12,12 @@ public class ConfigController(ConfigService configService) : ControllerBase
 	[HttpGet]
 	public IActionResult GetAll() => Ok(new
 	{
-		smtp    = configService.GetSmtp(),
-		pop3    = configService.GetPop3(),
-		imap    = configService.GetImap(),
-		dmarc   = configService.GetDmarc(),
-		mailbox = configService.GetMailbox()
+		smtp     = configService.GetSmtp(),
+		pop3     = configService.GetPop3(),
+		imap     = configService.GetImap(),
+		dmarc    = configService.GetDmarc(),
+		mailbox  = configService.GetMailbox(),
+		ipGroups = configService.GetIpGroups()
 	});
 
 	[HttpPost("smtp")]
@@ -51,6 +52,26 @@ public class ConfigController(ConfigService configService) : ControllerBase
 	public IActionResult SaveMailbox([FromBody] MailboxConfigDto dto)
 	{
 		configService.SaveMailbox(dto);
+		return Ok();
+	}
+
+	[HttpGet("maintenance-users")]
+	public IActionResult GetMaintenanceUsers() => Ok(configService.GetMaintenanceUsers());
+
+	[HttpPost("maintenance-users")]
+	public IActionResult SaveMaintenanceUsers([FromBody] List<MaintenanceUserDto> dto)
+	{
+		configService.SaveMaintenanceUsers(dto);
+		return Ok();
+	}
+
+	[HttpGet("ipgroups")]
+	public IActionResult GetIpGroups() => Ok(configService.GetIpGroups());
+
+	[HttpPost("ipgroups")]
+	public IActionResult SaveIpGroups([FromBody] List<IpGroupDto> dto)
+	{
+		configService.SaveIpGroups(dto);
 		return Ok();
 	}
 }

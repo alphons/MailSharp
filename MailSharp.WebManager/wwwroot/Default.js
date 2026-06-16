@@ -1599,3 +1599,341 @@ document.addEventListener('DOMContentLoaded', () =>
 	if (domainsBtn)
 		domainsBtn.addEventListener('click', () => { if (_domains.length === 0) loadDomains(); });
 });
+
+// ── Manager Users ──────────────────────────────────────────
+
+let _maintUsers = null;
+
+function initMaintUsers()
+{
+	const addBtn  = $id('mu-add-btn');
+	const saveBtn = $id('mu-save-btn');
+	if (!addBtn) return;
+
+	addBtn.addEventListener('click', () =>
+	{
+		if (!_maintUsers) return;
+		_maintUsers.push({ userName: '', password: '', role: 'Unknown', expireDays: 365, enabled: true });
+		renderMaintUsers();
+		// focus new row username field
+		const rows = $id('mu-tbody')?.querySelectorAll('tr');
+		rows?.[rows.length - 1]?.querySelector('.mu-username')?.focus();
+	});
+
+	saveBtn.addEventListener('click', async () =>
+	{
+		const msg = $id('mu-save-msg');
+		saveBtn.disabled = true;
+		try
+		{
+			_maintUsers = collectMaintUsers();
+			await apiFetch('/api/config/maintenance-users', _maintUsers);
+			showMsg(msg, true, 'Saved');
+		}
+		catch (e) { showMsg(msg, false, e.message || 'Error'); }
+		finally   { saveBtn.disabled = false; }
+	});
+
+	$id('mu-tbody')?.addEventListener('click', e =>
+	{
+		if (e.target.classList.contains('mu-remove'))
+		{
+			e.target.closest('tr').remove();
+		}
+	});
+}
+
+async function loadMaintUsers()
+{
+	try
+	{
+		_maintUsers = await apiFetch('/api/config/maintenance-users');
+		renderMaintUsers();
+	}
+	catch (e) { showMsg($id('msg-maint-users'), false, e.message || 'Error'); }
+}
+
+function renderMaintUsers()
+{
+	const tbody = $id('mu-tbody');
+	if (!tbody) return;
+	tbody.innerHTML = (_maintUsers || []).map(u => muRow(u)).join('');
+}
+
+function muRow(u)
+{
+	const isAdmin   = u.userName.toLowerCase() === 'admin';
+	const roleOpts  = ['Unknown', 'Administrator', 'User'].map(r =>
+		`<option${u.role === r ? ' selected' : ''}>${r}</option>`).join('');
+	const enabled   = u.enabled ?? true;
+
+	const toggleEl  = isAdmin
+		? `<label class="port-toggle-wrap" title="Admin is always enabled" style="opacity:.4;pointer-events:none">
+				<input type="checkbox" class="mu-enabled" checked disabled>
+				<span class="port-toggle-track"></span>
+			</label>`
+		: `<label class="port-toggle-wrap" title="${enabled ? 'Disable' : 'Enable'} user">
+				<input type="checkbox" class="mu-enabled"${enabled ? ' checked' : ''}>
+				<span class="port-toggle-track"></span>
+			</label>`;
+
+	const deleteEl  = isAdmin
+		? `<button type="button" class="dom-delete-btn" disabled title="Admin cannot be removed" style="opacity:.25;cursor:default">&times;</button>`
+		: `<button type="button" class="dom-delete-btn mu-remove" title="Remove">&times;</button>`;
+
+	return `<tr>
+		<td><input type="text"     class="dom-input mu-username" value="${esc(u.userName)}"    placeholder="username"${isAdmin ? ' readonly style="opacity:.6"' : ''}></td>
+		<td><input type="password" class="dom-input mu-password" value="${esc(u.password)}"    placeholder="••••••••" autocomplete="new-password"></td>
+		<td><select class="dom-input mu-role">${roleOpts}</select></td>
+		<td><input type="number"   class="dom-input mu-expire"   value="${u.expireDays ?? 365}" min="1" style="width:90px"></td>
+		<td style="text-align:center">${toggleEl}</td>
+		<td>${deleteEl}</td>
+	</tr>`;
+}
+
+function collectMaintUsers()
+{
+	return Array.from($id('mu-tbody')?.querySelectorAll('tr') ?? []).map(tr => ({
+		userName:   tr.querySelector('.mu-username')?.value.trim() ?? '',
+		password:   tr.querySelector('.mu-password')?.value        ?? '',
+		role:       tr.querySelector('.mu-role')?.value            || 'Administrator',
+		expireDays: parseInt(tr.querySelector('.mu-expire')?.value) || 365,
+		enabled:    tr.querySelector('.mu-enabled')?.checked ?? true
+	}));
+}
+
+document.addEventListener('DOMContentLoaded', () =>
+{
+	const btn = $id('tab-maint-users');
+	if (btn) btn.addEventListener('click', () => { if (!_maintUsers) loadMaintUsers(); });
+	initMaintUsers();
+});
+
+// ── IP Groups ──────────────────────────────────────────────
+
+let _ipGroups = null;
+const _ipgOpen = {};  // idx → bool
+
+function initIpGroups()
+{
+	const addBtn = $id('ipg-add-btn');
+	if (!addBtn) return;
+
+	addBtn.addEventListener('click', () =>
+	{
+		if (!_ipGroups) return;
+		_ipGroups.push({
+			name: 'New Group',
+			priority: _ipGroups.length + 1,
+			cidr: '0.0.0.0/0',
+			expires: null,
+			access: { smtp: true, pop3: true, imap: true, antiSpam: false, antiVirus: false, requireSslTlsForAuth: false },
+			emailFlows: {
+				localToLocal:        { allowed: false, requireAuth: false },
+				localToExternal:     { allowed: false, requireAuth: false },
+				externalToLocal:     { allowed: true,  requireAuth: false },
+				externalToExternal:  { allowed: false, requireAuth: false }
+			}
+		});
+		const newIdx = _ipGroups.length - 1;
+		_ipgOpen[newIdx] = true;
+		renderIpGroups();
+	});
+
+	const list = $id('ipg-list');
+	if (list)
+	{
+		list.addEventListener('click',  ipgListClick);
+		list.addEventListener('change', ipgListChange);
+	}
+}
+
+function ipgListClick(e)
+{
+	const t = e.target;
+	const idx = t.dataset.idx !== undefined ? parseInt(t.dataset.idx) : NaN;
+
+	if (t.dataset.action === 'ipg-toggle-expand') { _ipgOpen[idx] = !_ipgOpen[idx]; renderIpGroups(); return; }
+	if (t.dataset.action === 'ipg-delete')         { ipgDelete(idx); return; }
+	if (t.dataset.action === 'ipg-save')           { ipgSave(idx, t); return; }
+}
+
+function ipgListChange(e) { /* reserved */ }
+
+async function loadIpGroups()
+{
+	try
+	{
+		_ipGroups = await apiFetch('/api/config/ipgroups');
+		renderIpGroups();
+	}
+	catch (e) { showMsg($id('msg-ipgroups'), false, e.message || 'Error'); }
+}
+
+function renderIpGroups()
+{
+	const el = $id('ipg-list');
+	if (!el) return;
+	if (!_ipGroups || _ipGroups.length === 0)
+	{
+		el.innerHTML = '<p class="dom-empty">No IP groups configured yet.</p>';
+		return;
+	}
+	el.innerHTML = _ipGroups.map((g, i) => ipgCard(g, i)).join('');
+}
+
+function ipgCard(g, idx)
+{
+	const open = !!_ipgOpen[idx];
+	const body = open ? ipgCardBody(g, idx) : '';
+	return `
+	<div class="dom-card${open ? ' dom-card--open' : ''}" id="ipg-card-${idx}">
+		<div class="dom-card__header" data-action="ipg-toggle-expand" data-idx="${idx}">
+			<span class="dom-name-label" data-action="ipg-toggle-expand" data-idx="${idx}">${esc(g.name)}</span>
+			<span class="dom-hint" style="margin-left:8px;pointer-events:none">${esc(g.cidr)}</span>
+			<span style="margin-left:auto;margin-right:12px;color:var(--text-muted);font-size:.8em;pointer-events:none">Priority ${g.priority}</span>
+			<button class="dom-delete-btn" data-action="ipg-delete" data-idx="${idx}" title="Delete group">&times;</button>
+		</div>
+		${body}
+	</div>`;
+}
+
+function ipgCardBody(g, idx)
+{
+	const a  = g.access     || {};
+	const ef = g.emailFlows || {};
+
+	return `
+	<div style="padding:12px">
+		<div class="form-grid">
+			${field(`ipg-name-${idx}`,     'Name',                              g.name,          'text')}
+			${field(`ipg-cidr-${idx}`,     'CIDR',                              g.cidr,          'text')}
+			${field(`ipg-priority-${idx}`, 'Priority',                          g.priority,      'number')}
+			${field(`ipg-expires-${idx}`,  'Expires (ISO date, empty = never)', g.expires ?? '', 'text')}
+		</div>
+		<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:14px">
+			<div class="ipg-group">
+				<div class="ipg-group__legend">Access</div>
+				<div class="toggle-list">
+					${toggle(`ipg-smtp-${idx}`,     'SMTP',                 'Allow SMTP connections',            a.smtp                ?? false)}
+					${toggle(`ipg-pop3-${idx}`,     'POP3',                 'Allow POP3 connections',            a.pop3                ?? false)}
+					${toggle(`ipg-imap-${idx}`,     'IMAP',                 'Allow IMAP connections',            a.imap                ?? false)}
+					${toggle(`ipg-antispam-${idx}`, 'Anti-Spam',            'Apply anti-spam checks',            a.antiSpam            ?? false)}
+					${toggle(`ipg-antivirus-${idx}`,'Anti-Virus',           'Apply anti-virus checks',           a.antiVirus           ?? false)}
+					${toggle(`ipg-reqtls-${idx}`,   'Require TLS for Auth', 'Enforce TLS before authentication', a.requireSslTlsForAuth ?? false)}
+				</div>
+			</div>
+			<div class="ipg-group">
+				<div class="ipg-group__legend">Email Flows</div>
+				<table class="ports-table" style="width:100%">
+					<thead><tr><th>Flow</th><th style="text-align:center">Allowed</th><th style="text-align:center">Require Auth</th></tr></thead>
+					<tbody>
+						${ipgFlowRow(idx, 'localToLocal',       'Local → Local',       ef.localToLocal)}
+						${ipgFlowRow(idx, 'localToExternal',    'Local → External',    ef.localToExternal)}
+						${ipgFlowRow(idx, 'externalToLocal',    'External → Local',    ef.externalToLocal)}
+						${ipgFlowRow(idx, 'externalToExternal', 'External → External', ef.externalToExternal)}
+					</tbody>
+				</table>
+			</div>
+		</div>
+		<div class="cfg-footer">
+			<button class="btn-save" data-action="ipg-save" data-idx="${idx}">Save group</button>
+			<span class="save-msg" id="ipg-msg-${idx}"></span>
+		</div>
+	</div>`;
+}
+
+function ipgFlowRow(idx, key, label, flow)
+{
+	const f = flow || {};
+	return `<tr>
+		<td>${esc(label)}</td>
+		<td style="text-align:center">
+			<label class="port-toggle-wrap" title="Allowed">
+				<input type="checkbox" id="ipg-${key}-allowed-${idx}"${f.allowed ? ' checked' : ''}>
+				<span class="port-toggle-track"></span>
+			</label>
+		</td>
+		<td style="text-align:center">
+			<label class="port-toggle-wrap" title="Require Auth">
+				<input type="checkbox" id="ipg-${key}-reqauth-${idx}"${f.requireAuth ? ' checked' : ''}>
+				<span class="port-toggle-track"></span>
+			</label>
+		</td>
+	</tr>`;
+}
+
+function collectIpGroup(idx)
+{
+	const flowKeys = ['localToLocal', 'localToExternal', 'externalToLocal', 'externalToExternal'];
+	const emailFlows = {};
+	for (const k of flowKeys)
+		emailFlows[k] = {
+			allowed:     $id(`ipg-${k}-allowed-${idx}`)?.checked ?? false,
+			requireAuth: $id(`ipg-${k}-reqauth-${idx}`)?.checked ?? false
+		};
+
+	return {
+		name:     val(`ipg-name-${idx}`),
+		cidr:     val(`ipg-cidr-${idx}`),
+		priority: int(`ipg-priority-${idx}`),
+		expires:  val(`ipg-expires-${idx}`) || null,
+		access: {
+			smtp:                chk(`ipg-smtp-${idx}`),
+			pop3:                chk(`ipg-pop3-${idx}`),
+			imap:                chk(`ipg-imap-${idx}`),
+			antiSpam:            chk(`ipg-antispam-${idx}`),
+			antiVirus:           chk(`ipg-antivirus-${idx}`),
+			requireSslTlsForAuth: chk(`ipg-reqtls-${idx}`)
+		},
+		emailFlows
+	};
+}
+
+async function ipgSave(idx, btn)
+{
+	if (!_ipGroups) return;
+	_ipGroups[idx] = collectIpGroup(idx);
+	const msg = $id(`ipg-msg-${idx}`);
+	btn.disabled = true;
+	try
+	{
+		await apiFetch('/api/config/ipgroups', _ipGroups);
+		showMsg(msg, true, 'Saved');
+		renderIpGroups();
+		_ipgOpen[idx] = true;
+	}
+	catch (e) { showMsg(msg, false, e.message || 'Error'); }
+	finally   { btn.disabled = false; }
+}
+
+function ipgDelete(idx)
+{
+	if (!_ipGroups || !confirm('Remove this IP group?')) return;
+	_ipGroups.splice(idx, 1);
+	delete _ipgOpen[idx];
+	// re-index open state
+	const newOpen = {};
+	Object.keys(_ipgOpen).forEach(k =>
+	{
+		const ki = parseInt(k);
+		if (ki < idx) newOpen[ki] = _ipgOpen[k];
+		else if (ki > idx) newOpen[ki - 1] = _ipgOpen[k];
+	});
+	Object.keys(_ipgOpen).forEach(k => delete _ipgOpen[k]);
+	Object.assign(_ipgOpen, newOpen);
+
+	apiFetch('/api/config/ipgroups', _ipGroups)
+		.then(() => { showMsg($id('msg-ipgroups'), true, 'Deleted'); })
+		.catch(e  => { showMsg($id('msg-ipgroups'), false, e.message || 'Error'); });
+	renderIpGroups();
+}
+
+// load IP groups when tab becomes active
+document.addEventListener('DOMContentLoaded', () =>
+{
+	const ipgBtn = $id('tab-ipgroups');
+	if (ipgBtn)
+		ipgBtn.addEventListener('click', () => { if (!_ipGroups) loadIpGroups(); });
+	initIpGroups();
+});
