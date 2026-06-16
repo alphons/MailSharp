@@ -18,6 +18,7 @@ public class ConfigService(IWebHostEnvironment env)
 	public MailboxConfigDto    GetMailbox()  => MakeMailboxDto(BuildMerged());
 	public List<IpGroupDto>          GetIpGroups()          => MakeIpGroupsDto(BuildMerged());
 	public List<MaintenanceUserDto>  GetMaintenanceUsers()  => MakeMaintenanceUsersDto(BuildMerged());
+	public GeneralSettingsDto        GetGeneral()           => MakeGeneralDto(BuildMerged());
 
 	private IConfiguration BuildMerged()
 	{
@@ -114,6 +115,14 @@ public class ConfigService(IWebHostEnvironment env)
 	private static List<MaintenanceUserDto> MakeMaintenanceUsersDto(IConfiguration c) =>
 		c.GetSection("MaintenanceUsers").Get<List<MaintenanceUserDto>>() ?? [];
 
+	private static GeneralSettingsDto MakeGeneralDto(IConfiguration c) => new()
+	{
+		EmlStoragePath       = c["SmtpSettings:EmlStoragePath"]                                    ?? string.Empty,
+		CommandTimeoutSeconds = c.GetValue<int>("SmtpSettings:CommandTimeoutSeconds"),
+		BackLog              = c.GetValue<int>("SmtpSettings:BackLog"),
+		DnsResolvers         = c.GetSection("SmtpSettings:DnsResolvers").Get<List<string>>()       ?? []
+	};
+
 	// ── Write ───────────────────────────────────────────────
 
 	public void SaveSmtp(SmtpConfigDto dto)            => PatchSection("SmtpSettings", dto);
@@ -123,6 +132,19 @@ public class ConfigService(IWebHostEnvironment env)
 	public void SaveMailbox(MailboxConfigDto dto)       => PatchSection("MailboxSettings", dto);
 	public void SaveIpGroups(List<IpGroupDto> dto)                  => PatchSection("IpGroups", dto);
 	public void SaveMaintenanceUsers(List<MaintenanceUserDto> dto)  => PatchSection("MaintenanceUsers", dto);
+	public void SaveGeneral(GeneralSettingsDto dto)
+	{
+		// stored inside SmtpSettings so SMTP session code reads the same keys
+		var root    = ReadOverride();
+		var smtp    = root["SmtpSettings"]?.AsObject() ?? new System.Text.Json.Nodes.JsonObject();
+		smtp["EmlStoragePath"]        = dto.EmlStoragePath;
+		smtp["CommandTimeoutSeconds"] = dto.CommandTimeoutSeconds;
+		smtp["BackLog"]               = dto.BackLog;
+		smtp["DnsResolvers"]          = System.Text.Json.Nodes.JsonNode.Parse(
+			System.Text.Json.JsonSerializer.Serialize(dto.DnsResolvers, Pretty))!;
+		root["SmtpSettings"] = smtp;
+		File.WriteAllText(OverridePath, root.ToJsonString(Pretty));
+	}
 
 	private void PatchSection(string key, object dto)
 	{
@@ -310,6 +332,14 @@ public class EmailFlowsDto
 	public EmailFlowDto LocalToExternal      { get; set; } = new();
 	public EmailFlowDto ExternalToLocal      { get; set; } = new();
 	public EmailFlowDto ExternalToExternal   { get; set; } = new();
+}
+
+public class GeneralSettingsDto
+{
+	public string       EmlStoragePath        { get; set; } = string.Empty;
+	public int          CommandTimeoutSeconds  { get; set; }
+	public int          BackLog               { get; set; }
+	public List<string> DnsResolvers          { get; set; } = [];
 }
 
 public class MaintenanceUserDto

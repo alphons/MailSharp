@@ -252,9 +252,10 @@ async function loadInlineSettings(bodyId)
 	try
 	{
 		const cfg = await fetchConfig();
-		if      (bodyId === 'cfg-smtp-body') el.innerHTML = buildCfgSmtp(cfg.smtp, cfg.dmarc, cfg.mailbox);
+		if      (bodyId === 'cfg-smtp-body') el.innerHTML = buildCfgSmtp(cfg.smtp, cfg.dmarc);
 		else if (bodyId === 'cfg-imap-body') el.innerHTML = buildCfgImap(cfg.imap);
 		else if (bodyId === 'cfg-pop3-body') el.innerHTML = buildCfgPop3(cfg.pop3);
+		else if (bodyId === 'cfg-general-body') el.innerHTML = buildCfgGeneral(cfg.general);
 		wireSettingsContainer(el);
 	}
 	catch (e) { el.innerHTML = `<p style="color:var(--red)">${esc(e.message)}</p>`; }
@@ -268,7 +269,7 @@ async function saveConfig(key)
 		case 'pop3':    return apiFetch('/api/config/pop3',    collectPop3());
 		case 'imap':    return apiFetch('/api/config/imap',    collectImap());
 		case 'dmarc':   return apiFetch('/api/config/dmarc',   collectDmarc());
-		case 'mailbox': return apiFetch('/api/config/mailbox', collectMailbox());
+		case 'general': return apiFetch('/api/config/general', collectGeneral());
 	}
 }
 
@@ -307,7 +308,7 @@ function buildCfgSubtabs(tabs)
 
 // ── SMTP panel ─────────────────────────────────────────────
 
-function buildCfgSmtp(s, dmarc, mailbox)
+function buildCfgSmtp(s, dmarc)
 {
 	const secOpts = ['None', 'StartTls', 'Tls'].map(v =>
 		`<option value="${v}"${s.relayConnectionSecurity === v ? ' selected' : ''}>${v}</option>`
@@ -321,16 +322,7 @@ function buildCfgSmtp(s, dmarc, mailbox)
 				${toggle('smtp-enabled', 'Enable SMTP service', 'Start the SMTP server on startup', s.enabled ?? true)}
 			</div>
 			<div class="form-grid">
-				${field('smtp-emlpath',  'Email storage path',   s.emlStoragePath)}
-				${field('smtp-userstore','User store path',       s.userStorePath)}
-				${field('smtp-certpath', 'Certificate path',      s.certificatePath)}
-				${field('smtp-certpass', 'Certificate password',  s.certificatePassword, 'password')}
-				${field('smtp-timeout',  'Command timeout (sec)', s.commandTimeoutSeconds, 'number')}
-				${field('smtp-backlog',  'Backlog',                s.backLog, 'number')}
-			</div>
-			<div class="form-grid">
-				${textarea('smtp-dns',     'DNS Resolvers (one per line)', (s.dnsResolvers || []).join('\n'))}
-				${textarea('smtp-domains', 'Local domains (one per line)', (s.localDomains  || []).join('\n'))}
+				${field('smtp-welcome', 'Welcome message', s.welcomeMessage)}
 			</div>
 			<div class="cfg-footer">
 				<button class="btn-save" data-save="smtp">Save SMTP</button>
@@ -341,10 +333,13 @@ function buildCfgSmtp(s, dmarc, mailbox)
 			key: 'connections', label: 'Connections',
 			html: `
 			<div class="form-grid">
-				${field('smtp-maxconn', 'Maximum simultaneous connections (0 for unlimited)', s.maxConnections, 'number')}
-				${field('smtp-welcome', 'Welcome message',       s.welcomeMessage)}
-				${field('smtp-maxmsg',  'Max message size (KB)', s.maxMessageSizeKb, 'number')}
+				${field('smtp-maxconn', 'Max connections (0 = unlimited)', s.maxConnections, 'number')}
+				${field('smtp-maxmsg',  'Max message size (KB)',           s.maxMessageSizeKb, 'number')}
+				${field('smtp-certpath', 'Certificate path',               s.certificatePath)}
+				${field('smtp-certpass', 'Certificate password',           s.certificatePassword, 'password')}
 			</div>
+			<p class="cfg-restart-note" style="margin:12px 0">&#9888; restart required after port changes</p>
+			${buildPorts('smtp', s.ports)}
 			<div class="cfg-footer">
 				<button class="btn-save" data-save="smtp">Save SMTP</button>
 				<span class="save-msg" id="msg-smtp-conn"></span>
@@ -367,7 +362,8 @@ function buildCfgSmtp(s, dmarc, mailbox)
 			key: 'relayer', label: 'Relayer',
 			html: `
 			<div class="toggle-list">
-				${toggle('smtp-relay', 'Enable relay', 'Forward outgoing mail to an external SMTP server', s.relayEnabled)}
+				${toggle('smtp-relay',       'Enable relay',              'Forward outgoing mail to an external SMTP server', s.relayEnabled)}
+				${toggle('smtp-deliveredto', 'Add Delivered-To header',   'Insert Delivered-To header in relayed messages',   s.addDeliveredToHeader)}
 			</div>
 			<div class="form-grid">
 				${field('smtp-relayhost',  'Remote host name',   s.relayHost)}
@@ -393,23 +389,29 @@ function buildCfgSmtp(s, dmarc, mailbox)
 		{
 			key: 'security', label: 'Security',
 			html: `
-			<div class="cfg-section-title">RFC Compliance</div>
-			<div class="toggle-list">
-				${toggle('smtp-plainauth',   'Allow plain text authentication',           'Allow AUTH PLAIN and AUTH LOGIN',           s.allowPlainTextAuth)}
-				${toggle('smtp-emptysender', 'Allow empty sender address',                'Accept MAIL FROM:<>',                       s.allowEmptySender)}
-				${toggle('smtp-badlineends', 'Allow incorrectly formatted line endings',  'Accept bare CR or LF in message data',      s.allowBadLineEndings)}
-				${toggle('smtp-discbadcmds', 'Disconnect after too many invalid commands','Close connection on repeated bad commands',  s.disconnectOnTooManyInvalidCommands)}
-			</div>
-			<div class="form-grid">
-				${field('smtp-maxbadcmds', 'Maximum number of invalid commands', s.maxInvalidCommands, 'number')}
-			</div>
-			<div class="cfg-section-title">Auth / DKIM</div>
-			<div class="toggle-list">
-				${toggle('smtp-auth',     'Enable AUTH',     'Allow SMTP authentication',     s.enableAuth)}
-				${toggle('smtp-starttls', 'Enable STARTTLS', 'Advertise STARTTLS in EHLO',    s.enableStartTls)}
-				${toggle('smtp-vrfy',     'Enable VRFY',     'Allow address verification',     s.enableVrfy)}
-				${toggle('smtp-expn',     'Enable EXPN',     'Allow mailing list expansion',   s.enableExpn)}
-				${toggle('smtp-dkim',     'Require DKIM',    'Reject mail without valid DKIM', s.requireDkim)}
+			<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+				<div class="ipg-group">
+					<div class="ipg-group__legend">RFC Compliance</div>
+					<div class="toggle-list">
+						${toggle('smtp-plainauth',   'Allow plain text authentication',            'Allow AUTH PLAIN and AUTH LOGIN',          s.allowPlainTextAuth)}
+						${toggle('smtp-emptysender', 'Allow empty sender address',                 'Accept MAIL FROM:<>',                      s.allowEmptySender)}
+						${toggle('smtp-badlineends', 'Allow incorrectly formatted line endings',   'Accept bare CR or LF in message data',     s.allowBadLineEndings)}
+						${toggle('smtp-discbadcmds', 'Disconnect after too many invalid commands', 'Close connection on repeated bad commands', s.disconnectOnTooManyInvalidCommands)}
+					</div>
+					<div class="form-grid" style="margin-top:12px">
+						${field('smtp-maxbadcmds', 'Maximum invalid commands', s.maxInvalidCommands, 'number')}
+					</div>
+				</div>
+				<div class="ipg-group">
+					<div class="ipg-group__legend">Auth / DKIM</div>
+					<div class="toggle-list">
+						${toggle('smtp-auth',     'Enable AUTH',     'Allow SMTP authentication',     s.enableAuth)}
+						${toggle('smtp-starttls', 'Enable STARTTLS', 'Advertise STARTTLS in EHLO',    s.enableStartTls)}
+						${toggle('smtp-vrfy',     'Enable VRFY',     'Allow address verification',    s.enableVrfy)}
+						${toggle('smtp-expn',     'Enable EXPN',     'Allow mailing list expansion',  s.enableExpn)}
+						${toggle('smtp-dkim',     'Require DKIM',    'Reject mail without valid DKIM',s.requireDkim)}
+					</div>
+				</div>
 			</div>
 			<div class="cfg-footer">
 				<button class="btn-save" data-save="smtp">Save SMTP</button>
@@ -417,30 +419,16 @@ function buildCfgSmtp(s, dmarc, mailbox)
 			</div>`
 		},
 		{
-			key: 'advanced', label: 'Advanced',
+			key: 'limits', label: 'Limits',
 			html: `
 			<div class="form-grid">
-				${field('smtp-bindip',        'Bind to local IP address',          s.bindToLocalIp)}
-				${field('smtp-maxrecipients', 'Maximum recipients in batch',       s.maxRecipientsPerBatch, 'number')}
-				${field('smtp-ruleloop',      'Rule loop limit',                   s.ruleLoopLimit,         'number')}
-				${field('smtp-maxrechosts',   'Maximum number of recipient hosts', s.maxRecipientHosts,     'number')}
-			</div>
-			<div class="toggle-list">
-				${toggle('smtp-deliveredto', 'Add Delivered-To header', 'Insert Delivered-To header in relayed messages', s.addDeliveredToHeader)}
+				${field('smtp-maxrecipients', 'Max recipients per batch',    s.maxRecipientsPerBatch, 'number')}
+				${field('smtp-ruleloop',      'Rule loop limit',             s.ruleLoopLimit,         'number')}
+				${field('smtp-maxrechosts',   'Max recipient hosts',         s.maxRecipientHosts,     'number')}
 			</div>
 			<div class="cfg-footer">
 				<button class="btn-save" data-save="smtp">Save SMTP</button>
-				<span class="save-msg" id="msg-smtp-adv"></span>
-			</div>`
-		},
-		{
-			key: 'ports', label: 'Ports',
-			html: `
-			<p class="cfg-restart-note" style="margin-bottom:12px">&#9888; restart required after port changes</p>
-			${buildPorts('smtp', s.ports)}
-			<div class="cfg-footer">
-				<button class="btn-save" data-save="smtp">Save SMTP</button>
-				<span class="save-msg" id="msg-smtp-ports"></span>
+				<span class="save-msg" id="msg-smtp-lim"></span>
 			</div>`
 		},
 		{
@@ -453,17 +441,6 @@ function buildCfgSmtp(s, dmarc, mailbox)
 			<div class="cfg-footer">
 				<button class="btn-save" data-save="dmarc">Save DMARC</button>
 				<span class="save-msg" id="msg-dmarc"></span>
-			</div>`
-		},
-		{
-			key: 'mailbox', label: 'Mailbox',
-			html: `
-			<div class="form-grid">
-				${field('mailbox-path', 'Storage path', mailbox.storagePath)}
-			</div>
-			<div class="cfg-footer">
-				<button class="btn-save" data-save="mailbox">Save Mailbox</button>
-				<span class="save-msg" id="msg-mailbox"></span>
 			</div>`
 		}
 	];
@@ -483,9 +460,7 @@ function buildCfgPop3(s)
 				${toggle('pop3-enabled', 'Enable POP3 service', 'Start the POP3 server on startup', s.enabled ?? true)}
 			</div>
 			<div class="form-grid">
-				${field('pop3-certpath', 'Certificate path',     s.certificatePath)}
-				${field('pop3-certpass', 'Certificate password', s.certificatePassword, 'password')}
-				${field('pop3-welcome',  'Welcome message',      s.welcomeMessage)}
+				${field('pop3-welcome', 'Welcome message', s.welcomeMessage)}
 			</div>
 			<div class="cfg-footer">
 				<button class="btn-save" data-save="pop3">Save POP3</button>
@@ -496,21 +471,15 @@ function buildCfgPop3(s)
 			key: 'connections', label: 'Connections',
 			html: `
 			<div class="form-grid">
-				${field('pop3-maxconn', 'Maximum simultaneous connections (0 for unlimited)', s.maxConnections, 'number')}
+				${field('pop3-maxconn', 'Max connections (0 = unlimited)', s.maxConnections, 'number')}
+				${field('pop3-certpath', 'Certificate path',     s.certificatePath)}
+				${field('pop3-certpass', 'Certificate password', s.certificatePassword, 'password')}
 			</div>
-			<div class="cfg-footer">
-				<button class="btn-save" data-save="pop3">Save POP3</button>
-				<span class="save-msg" id="msg-pop3-conn"></span>
-			</div>`
-		},
-		{
-			key: 'ports', label: 'Ports',
-			html: `
-			<p class="cfg-restart-note" style="margin-bottom:12px">&#9888; restart required after port changes</p>
+			<p class="cfg-restart-note" style="margin:12px 0">&#9888; restart required after port changes</p>
 			${buildPorts('pop3', s.ports)}
 			<div class="cfg-footer">
 				<button class="btn-save" data-save="pop3">Save POP3</button>
-				<span class="save-msg" id="msg-pop3-ports"></span>
+				<span class="save-msg" id="msg-pop3-conn"></span>
 			</div>`
 		}
 	];
@@ -534,13 +503,7 @@ function buildCfgImap(s)
 				${toggle('imap-enabled', 'Enable IMAP service', 'Start the IMAP server on startup', s.enabled ?? true)}
 			</div>
 			<div class="form-grid">
-				${field('imap-certpath', 'Certificate path',     s.certificatePath)}
-				${field('imap-certpass', 'Certificate password', s.certificatePassword, 'password')}
-				${field('imap-welcome',  'Welcome message',      s.welcomeMessage)}
-			</div>
-			<div class="form-field">
-				<label for="imap-delim">Hierarchy delimiter</label>
-				<select id="imap-delim">${delimOpts}</select>
+				${field('imap-welcome', 'Welcome message', s.welcomeMessage)}
 			</div>
 			<div class="cfg-footer">
 				<button class="btn-save" data-save="imap">Save IMAP</button>
@@ -551,8 +514,12 @@ function buildCfgImap(s)
 			key: 'connections', label: 'Connections',
 			html: `
 			<div class="form-grid">
-				${field('imap-maxconn', 'Maximum simultaneous connections (0 for unlimited)', s.maxConnections, 'number')}
+				${field('imap-maxconn',  'Max connections (0 = unlimited)', s.maxConnections, 'number')}
+				${field('imap-certpath', 'Certificate path',                s.certificatePath)}
+				${field('imap-certpass', 'Certificate password',            s.certificatePassword, 'password')}
 			</div>
+			<p class="cfg-restart-note" style="margin:12px 0">&#9888; restart required after port changes</p>
+			${buildPorts('imap', s.ports)}
 			<div class="cfg-footer">
 				<button class="btn-save" data-save="imap">Save IMAP</button>
 				<span class="save-msg" id="msg-imap-conn"></span>
@@ -563,6 +530,10 @@ function buildCfgImap(s)
 			html: `
 			<div class="form-grid">
 				${field('imap-publicfolder', 'Public folder name', s.publicFolderName)}
+			</div>
+			<div class="form-field" style="margin-top:12px">
+				<label for="imap-delim">Hierarchy delimiter</label>
+				<select id="imap-delim">${delimOpts}</select>
 			</div>
 			<div class="cfg-footer">
 				<button class="btn-save" data-save="imap">Save IMAP</button>
@@ -581,16 +552,6 @@ function buildCfgImap(s)
 			<div class="cfg-footer">
 				<button class="btn-save" data-save="imap">Save IMAP</button>
 				<span class="save-msg" id="msg-imap-adv"></span>
-			</div>`
-		},
-		{
-			key: 'ports', label: 'Ports',
-			html: `
-			<p class="cfg-restart-note" style="margin-bottom:12px">&#9888; restart required after port changes</p>
-			${buildPorts('imap', s.ports)}
-			<div class="cfg-footer">
-				<button class="btn-save" data-save="imap">Save IMAP</button>
-				<span class="save-msg" id="msg-imap-ports"></span>
 			</div>`
 		}
 	];
@@ -644,21 +605,16 @@ function collectSmtp()
 {
 	return {
 		enabled:               chk('smtp-enabled'),
-		emlStoragePath:        val('smtp-emlpath'),
-		userStorePath:         val('smtp-userstore'),
+		welcomeMessage:        val('smtp-welcome'),
 		certificatePath:       val('smtp-certpath'),
 		certificatePassword:   val('smtp-certpass'),
-		commandTimeoutSeconds: int('smtp-timeout'),
-		backLog:               int('smtp-backlog'),
-		dnsResolvers:          lines('smtp-dns'),
-		localDomains:          lines('smtp-domains'),
 		maxConnections:        int('smtp-maxconn'),
-		welcomeMessage:        val('smtp-welcome'),
 		maxMessageSizeKb:      int('smtp-maxmsg'),
 		retryCount:            int('smtp-retries'),
 		retryIntervalMinutes:  int('smtp-retryinterval'),
 		localHostName:         val('smtp-localhost'),
 		relayEnabled:          chk('smtp-relay'),
+		addDeliveredToHeader:  chk('smtp-deliveredto'),
 		relayHost:             val('smtp-relayhost'),
 		relayPort:             int('smtp-relayport'),
 		relayQueuePath:        val('smtp-relayqueue'),
@@ -671,9 +627,7 @@ function collectSmtp()
 		allowBadLineEndings:   chk('smtp-badlineends'),
 		disconnectOnTooManyInvalidCommands: chk('smtp-discbadcmds'),
 		maxInvalidCommands:    int('smtp-maxbadcmds'),
-		bindToLocalIp:         val('smtp-bindip'),
 		maxRecipientsPerBatch: int('smtp-maxrecipients'),
-		addDeliveredToHeader:  chk('smtp-deliveredto'),
 		ruleLoopLimit:         int('smtp-ruleloop'),
 		maxRecipientHosts:     int('smtp-maxrechosts'),
 		enableAuth:            chk('smtp-auth'),
@@ -718,11 +672,6 @@ function collectImap()
 function collectDmarc()
 {
 	return { failOpen: chk('dmarc-failopen'), requireDmarc: chk('dmarc-require') };
-}
-
-function collectMailbox()
-{
-	return { storagePath: val('mailbox-path') };
 }
 
 function collectPorts(prefix)
@@ -1599,6 +1548,55 @@ document.addEventListener('DOMContentLoaded', () =>
 	if (domainsBtn)
 		domainsBtn.addEventListener('click', () => { if (_domains.length === 0) loadDomains(); });
 });
+
+// load General Settings when tab becomes active
+document.addEventListener('DOMContentLoaded', () =>
+{
+	const btn = $id('tab-general');
+	if (btn) btn.addEventListener('click', async () =>
+	{
+		const el = $id('cfg-general-body');
+		if (!el || el.innerHTML.trim()) return;
+		el.innerHTML = '<p class="cfg-loading">Loading…</p>';
+		try
+		{
+			const cfg = await fetchConfig();
+			el.innerHTML = buildCfgGeneral(cfg.general);
+			wireSettingsContainer(el);
+		}
+		catch (e) { el.innerHTML = `<p style="color:var(--red)">${esc(e.message)}</p>`; }
+	});
+});
+
+// ── General Settings panel ─────────────────────────────────
+
+function buildCfgGeneral(g)
+{
+	g = g || {};
+	return `
+	<div class="form-grid">
+		${field('gen-emlpath', 'Email storage path',    g.emlStoragePath)}
+		${field('gen-timeout', 'Command timeout (sec)', g.commandTimeoutSeconds, 'number')}
+		${field('gen-backlog', 'Backlog',               g.backLog, 'number')}
+	</div>
+	<div class="form-grid">
+		${textarea('gen-dns', 'DNS Resolvers (one per line)', (g.dnsResolvers || []).join('\n'))}
+	</div>
+	<div class="cfg-footer">
+		<button class="btn-save" data-save="general">Save General Settings</button>
+		<span class="save-msg" id="msg-general"></span>
+	</div>`;
+}
+
+function collectGeneral()
+{
+	return {
+		emlStoragePath:       val('gen-emlpath'),
+		commandTimeoutSeconds: int('gen-timeout'),
+		backLog:              int('gen-backlog'),
+		dnsResolvers:         lines('gen-dns')
+	};
+}
 
 // ── Manager Users ──────────────────────────────────────────
 

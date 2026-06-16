@@ -17,7 +17,8 @@ public class ConfigController(ConfigService configService) : ControllerBase
 		imap     = configService.GetImap(),
 		dmarc    = configService.GetDmarc(),
 		mailbox  = configService.GetMailbox(),
-		ipGroups = configService.GetIpGroups()
+		ipGroups = configService.GetIpGroups(),
+		general  = configService.GetGeneral()
 	});
 
 	[HttpPost("smtp")]
@@ -52,6 +53,16 @@ public class ConfigController(ConfigService configService) : ControllerBase
 	public IActionResult SaveMailbox([FromBody] MailboxConfigDto dto)
 	{
 		configService.SaveMailbox(dto);
+		return Ok();
+	}
+
+	[HttpGet("general")]
+	public IActionResult GetGeneral() => Ok(configService.GetGeneral());
+
+	[HttpPost("general")]
+	public IActionResult SaveGeneral([FromBody] GeneralSettingsDto dto)
+	{
+		configService.SaveGeneral(dto);
 		return Ok();
 	}
 
