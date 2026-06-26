@@ -11,7 +11,7 @@ builder.Configuration.AddJsonFile(
 	optional: true,
 	reloadOnChange: true);
 
-builder.Services.AddMvcCore();//.WithMultiParameterModelBinding();
+builder.Services.AddMvcCore();
 
 builder.Services.AddRazorUnderRoot();
 
