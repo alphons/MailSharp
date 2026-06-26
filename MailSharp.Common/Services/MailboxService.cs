@@ -1,11 +1,27 @@
-﻿using System.Text.Json;
+using System.Text.Json;
 
 namespace MailSharp.Common.Services;
 
 public class MailboxService(
-	IConfiguration configuration, 
+	IConfiguration configuration,
 	ILogger<MailboxService> logger)
 {
+	// Builds the mailbox root path for a user.
+	// Accepts "user@domain.com" → {storagePath}/domain.com/user
+	// or plain "user"          → {storagePath}/user  (fallback)
+	private string MailboxRoot(string username)
+	{
+		string storagePath = configuration["MailboxSettings:StoragePath"]
+			?? throw new InvalidOperationException("MailboxSettings:StoragePath not configured");
+		int at = username.IndexOf('@');
+		if (at > 0 && at < username.Length - 1)
+		{
+			string user = username[..at];
+			string domain = username[(at + 1)..];
+			return Path.Combine(storagePath, domain, user);
+		}
+		return Path.Combine(storagePath, username);
+	}
 
 	// Retrieve list of messages for a user in a specific folder
 	public async Task<List<Message>> GetMessagesAsync(string username, string folder, CancellationToken cancellationToken)
@@ -19,10 +35,7 @@ public class MailboxService(
 
 		try
 		{
-			string mailboxPath = Path.Combine(
-				configuration["MailboxSettings:StoragePath"] ?? throw new InvalidOperationException("MailboxStoragePath not configured"),
-				username,
-				folder);
+			string mailboxPath = Path.Combine(MailboxRoot(username), folder);
 			if (!Directory.Exists(mailboxPath))
 			{
 				return new List<Message>();
@@ -68,10 +81,7 @@ public class MailboxService(
 
 		try
 		{
-			string mailboxPath = Path.Combine(
-				configuration["MailboxSettings:StoragePath"] ?? throw new InvalidOperationException("MailboxStoragePath not configured"),
-				username,
-				folder);
+			string mailboxPath = Path.Combine(MailboxRoot(username), folder);
 			string filePath = Path.Combine(mailboxPath, $"{messageId}.eml");
 			string metadataPath = Path.Combine(mailboxPath, $"{messageId}.json");
 
@@ -115,10 +125,7 @@ public class MailboxService(
 
 		try
 		{
-			string mailboxPath = Path.Combine(
-				configuration["MailboxSettings:StoragePath"] ?? throw new InvalidOperationException("MailboxStoragePath not configured"),
-				username,
-				folder);
+			string mailboxPath = Path.Combine(MailboxRoot(username), folder);
 			if (Directory.Exists(mailboxPath))
 			{
 				logger.LogWarning(
@@ -154,10 +161,7 @@ public class MailboxService(
 
 		try
 		{
-			string mailboxPath = Path.Combine(
-				configuration["MailboxSettings:StoragePath"] ?? throw new InvalidOperationException("MailboxStoragePath not configured"),
-				username,
-				folder);
+			string mailboxPath = Path.Combine(MailboxRoot(username), folder);
 			if (!Directory.Exists(mailboxPath))
 			{
 				logger.LogWarning(
@@ -193,18 +197,16 @@ public class MailboxService(
 
 		try
 		{
-			string mailboxPath = Path.Combine(
-				configuration["MailboxSettings:StoragePath"] ?? throw new InvalidOperationException("MailboxStoragePath not configured"),
-				username);
+			string mailboxPath = MailboxRoot(username);
 			if (!Directory.Exists(mailboxPath))
 			{
-				return new List<string> { "INBOX" }; // Default folder
+				return new List<string> { "INBOX" };
 			}
 
 			var folders = Directory.GetDirectories(mailboxPath)
 				.Select(d => Path.GetFileName(d))
 				.ToList();
-			folders.Add("INBOX"); // Ensure INBOX is always included
+			folders.Add("INBOX");
 			return await Task.FromResult(folders);
 		}
 		catch (Exception ex)
@@ -230,10 +232,7 @@ public class MailboxService(
 
 		try
 		{
-			string mailboxPath = Path.Combine(
-				configuration["MailboxSettings:StoragePath"] ?? throw new InvalidOperationException("MailboxStoragePath not configured"),
-				username,
-				folder);
+			string mailboxPath = Path.Combine(MailboxRoot(username), folder);
 			string metadataPath = Path.Combine(mailboxPath, $"{messageId}.json");
 
 			if (!File.Exists(Path.Combine(mailboxPath, $"{messageId}.eml")))
@@ -272,10 +271,7 @@ public class MailboxService(
 
 		try
 		{
-			string mailboxPath = Path.Combine(
-				configuration["MailboxSettings:StoragePath"] ?? throw new InvalidOperationException("MailboxStoragePath not configured"),
-				username,
-				folder);
+			string mailboxPath = Path.Combine(MailboxRoot(username), folder);
 			string filePath = Path.Combine(mailboxPath, $"{messageId}.eml");
 
 			if (!File.Exists(filePath))

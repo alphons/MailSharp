@@ -78,12 +78,8 @@ public class Pop3Session(
 						await SendResponseAsync($"+OK {messages.Count} messages", cancellationToken);
 						for (int i = 0; i < messages.Count; i++)
 						{
-							string filePath = Path.Combine(
-								configuration["MailboxSettings:StoragePath"] ?? throw new InvalidOperationException("MailboxStoragePath not configured"),
-								username!,
-								"INBOX",
-								$"{messages[i].Uid}.eml");
-							long size = File.Exists(filePath) ? new FileInfo(filePath).Length : 0;
+							string? listContent = await mailboxService.GetMessageContentAsync(username!, "INBOX", messages[i].Uid, cancellationToken);
+							long size = listContent?.Length ?? 0;
 							await SendResponseAsync($"{i + 1} {size}", cancellationToken);
 						}
 						await SendResponseAsync(".", cancellationToken);

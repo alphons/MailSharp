@@ -65,15 +65,21 @@ public partial class SmtpSession
 
 		string signedEml = emlContent.ToString();
 
-		// Save .eml file
-		string storagePath = configuration["SmtpSettings:EmlStoragePath"] ?? throw new InvalidOperationException("EmlStoragePath not configured");
-		Directory.CreateDirectory(storagePath);
-		string fileName = Path.Combine(storagePath, $"{Guid.NewGuid()}.eml");
-		await File.WriteAllTextAsync(fileName, signedEml, ct);
+		// Deliver .eml to each recipient's INBOX under {MailboxSettings:StoragePath}/{domain}/{user}/INBOX/
+		string storagePath = configuration["MailboxSettings:StoragePath"] ?? throw new InvalidOperationException("MailboxSettings:StoragePath not configured");
+		string messageId = Guid.NewGuid().ToString();
+		foreach (string recipient in rcptTo)
+		{
+			string domain = ExtractDomain(recipient);
+			string user = ExtractUser(recipient);
+			string inboxPath = Path.Combine(storagePath, domain, user, "INBOX");
+			Directory.CreateDirectory(inboxPath);
+			string fileName = Path.Combine(inboxPath, $"{messageId}.eml");
+			await File.WriteAllTextAsync(fileName, signedEml, ct);
+			logger.LogInformation("Received email from {MailFrom} to {Recipient} saved as {FileName}", mailFrom, recipient, fileName);
+		}
 
 		await writer.WriteLineAsync(configuration["SmtpResponses:MessageAccepted"], ct);
-
-		logger.LogInformation("Received email from {MailFrom} to {RcptTo} saved as {FileName}", mailFrom, string.Join(", ", rcptTo), fileName);
 
 		var rcptDomains = rcptTo.Select(r => ExtractDomain(r)).Where(d => d.Length > 0);
 		metrics.MessageReceived(mailFromDomain, rcptDomains, signedEml.Length);
@@ -83,9 +89,9 @@ public partial class SmtpSession
 		data.Clear();
 	}
 
-	// Extracts the FQDN from any address format:
-	//   user@domain.com  →  domain.com
-	//   <user@domain.com>  →  domain.com
+	// Extracts the domain from any address format:
+	//   user@domain.com            →  domain.com
+	//   <user@domain.com>          →  domain.com
 	//   Display Name <user@domain.com>  →  domain.com
 	private static string ExtractDomain(string address)
 	{
@@ -97,6 +103,19 @@ public partial class SmtpSession
 		while (len < after.Length && (char.IsLetterOrDigit(after[len]) || after[len] == '.' || after[len] == '-'))
 			len++;
 		return after[..len];
+	}
+
+	// Extracts the local part (user) from any address format:
+	//   user@domain.com            →  user
+	//   <user@domain.com>          →  user
+	//   Display Name <user@domain.com>  →  user
+	private static string ExtractUser(string address)
+	{
+		int at = address.IndexOf('@');
+		if (at < 0)
+			return string.Empty;
+		int start = address.LastIndexOf('<', at);
+		return start >= 0 ? address[(start + 1)..at] : address[..at];
 	}
 
 }
