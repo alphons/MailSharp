@@ -1,85 +1,86 @@
-# MailSharp: The Ultimate Email Server Solution (beta v0.0) 🌟
+# MailSharp
 
-Welcome to **MailSharp**, the most electrifying, robust, and cutting-edge email server framework ever built! Crafted with the power of C# 12 and .NET Core 8, MailSharp is your one-stop solution for SMTP, IMAP, and POP3 services, delivering unparalleled performance, security, and scalability. Whether you're building a corporate email system or a personal mail server, MailSharp is here to revolutionize your email experience with a flair of awesomeness! 🚀
+A self-hosted email server built with C# and .NET 10, providing SMTP, IMAP, and POP3 services with an integrated web management interface.
 
-## Why MailSharp? It's Simply Epic! 🎉
+## Features
 
-- **Blazing Fast Protocols**: Implements SMTP, IMAP, and POP3 with lightning speed, supporting secure TLS connections and advanced authentication mechanisms like PLAIN, CRAM-MD5, and LOGIN.
-- **DKIM & SPF Superpowers**: Ensure email authenticity with built-in DKIM signing/verification and SPF checking, keeping spam at bay and your domain's reputation pristine.
-- **Web Management Wizardry**: A sleek, ASP.NET Core-powered web interface for effortless server status monitoring and user management, wrapped in a responsive, modern UI.
-- **Rock-Solid Security**: Supports STARTTLS, SSL/TLS, and configurable authentication, with cookie-based authorization for the web manager, ensuring your data stays locked tight.
-- **Scalable & Configurable**: Fine-tune your server with a comprehensive `appsettings.json`, supporting multiple ports, IP groups, and email flow policies for ultimate flexibility.
-- **Logging Like a Rockstar**: Detailed logging with structured event IDs for every action, making debugging and monitoring a breeze.
+- **SMTP** — ports 25, 587 (STARTTLS), and 465 (TLS); DKIM signing/verification; SPF and DMARC checking; relay support; configurable email flow policies per IP group
+- **IMAP** — ports 143 (STARTTLS) and 993 (TLS); IDLE, ACL, QUOTA, SORT extensions; public folder support
+- **POP3** — ports 110 and 995 (TLS)
+- **Web Manager** — ASP.NET Core Razor Pages dashboard for server status, domain management, and configuration; role-based access (User / Administrator)
+- **DNS** — built-in async DNS resolver with configurable upstream servers
+- **IP Groups** — per-CIDR access control with per-protocol and per-email-flow policies, expiry support
+- **Anti-spam / Anti-virus** — pluggable per IP group
 
-## Features That Will Blow Your Mind 🤯
+## Project Structure
 
-- **SMTP Server**: Handles HELO, EHLO, MAIL, RCPT, DATA, QUIT, and more, with DKIM signing, SPF validation, and support for VRFY/EXPN commands.
-- **IMAP & POP3 Servers**: Seamless email retrieval with support for secure connections and efficient mailbox operations like message listing and deletion.
-- **Web Manager**: A user-friendly dashboard to check server status, manage logins, and more, with role-based authorization (User and Administrator roles).
-- **Extensible Architecture**: Modular design with service extensions for easy integration of SMTP, IMAP, and POP3 services into your application.
-- **Configuration Galore**: Customize everything from ports to TLS settings, credentials, and DKIM keys via a single, powerful configuration file.
+| Project | Description |
+|---|---|
+| `MailSharp.Common` | Shared interfaces, models, and service extensions |
+| `MailSharp.DNS` | Async DNS resolver |
+| `MailSharp.SMTP` | SMTP server |
+| `MailSharp.IMAP` | IMAP server |
+| `MailSharp.POP3` | POP3 server |
+| `MailSharp.WebManager` | ASP.NET Core web application and host process |
+| `MailSharp.TestFormApp` | WinForms test client |
 
-## Getting Started: Unleash the Power! 💪
+## Getting Started
 
-1. **Clone the Repository**:
-   ```bash
-   git clone https://github.com/alphons/MailSharp.git
-   cd MailSharp
-   ```
+### Prerequisites
 
-2. **Install Dependencies**:
-   Ensure you have .NET Core 8 or higher installed. Then, restore the project:
-   ```bash
-   dotnet restore
-   ```
+- [.NET 10 SDK](https://dotnet.microsoft.com/download)
+- A valid TLS certificate (`.pfx`) for your mail domain
 
-3. **Configure Your Server**:
-   Edit `appsettings.json` to set your host, ports, credentials, and DKIM keys. Example:
-   ```json
-   "SmtpSettings": {
-	"Ports": [
-		{ "Host": "127.0.0.1", "Port": 25, "Security": "None" },
-		{ "Host": "127.0.0.1", "Port": 587, "Security": "StartTls" },
-		{ "Host": "127.0.0.1", "Port": 465, "Security": "Tls" }
-	],
-     "CertificatePath": "certificate.pfx",
-     "CertificatePassword": "yourpassword"
-   }
-   ```
+### Build and run
 
-4. **Run the Beast**:
-   Launch the server and web manager:
-   ```bash
-   dotnet run --project MailSharp.WebManager
-   ```
+```bash
+git clone https://github.com/alphons/MailSharp.git
+cd MailSharp
+dotnet run --project MailSharp.WebManager
+```
 
-5. **Access the Web Interface**:
-   Open your browser and navigate to `https://localhost:5001` to log in and monitor your server. Default admin credentials: `admin/Admin123`.
+The web interface is available at `https://localhost:5001`.
 
-## Project Structure: A Masterpiece of Organization 🎨
+Default admin credentials: `admin` / `admin` — **change these before exposing the server externally**.
 
-- **MailSharp.Common**: Core utilities, including `EventIdConfig`, `IServerStatus`, and service extensions for authentication and mailbox operations.
-- **MailSharp.SMTP**: Full-fledged SMTP server with DKIM signing, SPF checking, and support for advanced commands like AUTH and STARTTLS.
-- **MailSharp.IMAP**: Robust IMAP server for email retrieval, supporting LOGIN, LIST, and STARTTLS commands.
-- **MailSharp.POP3**: Efficient POP3 server for simple email access, with USER, PASS, and LIST commands.
-- **MailSharp.WebManager**: ASP.NET Core web application with Razor pages, secure authentication, and a status API for monitoring server health.
+### Install as a Windows Service
 
-## Configuration: Your Command Center 🛠️
+Run `_install.cmd` as Administrator from the published output directory. The script creates and starts a `MailSharp` Windows Service configured for delayed auto-start with automatic restart on failure.
 
-The `appsettings.json` file is your gateway to ultimate control. Key sections include:
-- **Users**: Define web interface users with roles and expiration settings.
-- **SmtpSettings/Pop3Settings/ImapSettings**: Configure hosts, ports, TLS, and security options.
-- **SmtpResponses/SmtpLogMessages**: Customize server responses and logging messages.
-- **IpGroups**: Set up access policies for different network ranges, controlling services and email flows.
+To remove the service, run `_uninstall.cmd` as Administrator.
 
-## Contributing: Join the Revolution! 🔥
+## Configuration
 
-We welcome contributions from developers who want to make email servers legendary! Fork the repo, create a feature branch, and submit a pull request. Check out our [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+All server settings are stored in `mailsharp.json` alongside the executable. The web manager provides a UI for most settings; `appsettings.json` controls logging and ASP.NET host options only.
 
-## License: Freedom to Innovate 📜
+### Key sections in `mailsharp.json`
 
-MailSharp is licensed under the MIT License, giving you the freedom to use, modify, and distribute this epic software as you see fit.
+**`IpGroups`** — define CIDR ranges with per-protocol access and email flow policies:
+```json
+{
+  "Name": "Remote",
+  "Priority": 3,
+  "Cidr": "0.0.0.0/0",
+  "Access": { "Smtp": true, "Pop3": false, "Imap": true, "RequireSslTlsForAuth": true },
+  "EmailFlows": {
+    "ExternalToLocal": { "Allowed": true, "RequireAuth": false },
+    "LocalToExternal": { "Allowed": false, "RequireAuth": true }
+  }
+}
+```
 
-## Why Settle for Less? Choose MailSharp! 🌍
+**`SmtpSettings`** — ports, TLS certificate, local domains, relay, DKIM, storage paths, connection limits.
 
-MailSharp isn't just an email server—it's a game-changer, a masterpiece, and a testament to what modern .NET development can achieve. Deploy it, love it, and let your email infrastructure soar to new heights! 🚀
+**`Pop3Settings` / `ImapSettings`** — ports, TLS certificate, connection limits, IMAP extensions.
+
+**`MailboxSettings`** — path where mailboxes are stored on disk.
+
+**`MaintenanceUsers`** — web manager accounts with roles and optional expiry.
+
+## License
+
+MIT
+
+## Contributing
+
+Fork the repository, create a feature branch, and open a pull request.
