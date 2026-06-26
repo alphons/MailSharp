@@ -1,4 +1,4 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 using System.Text.Json.Nodes;
 
 namespace MailSharp.WebManager.Services;
@@ -42,7 +42,6 @@ public class ConfigService(IWebHostEnvironment env)
 		RequireDkim           = c.GetValue<bool>("SmtpSettings:RequireDkim"),
 		CertificatePath       = c["SmtpSettings:CertificatePath"] ?? string.Empty,
 		CertificatePassword   = c["SmtpSettings:CertificatePassword"] ?? string.Empty,
-		UserStorePath         = c["SmtpSettings:UserStorePath"] ?? string.Empty,
 		DnsResolvers          = c.GetSection("SmtpSettings:DnsResolvers").Get<List<string>>() ?? [],
 		LocalDomains          = c.GetSection("SmtpSettings:LocalDomains").Get<List<string>>() ?? [],
 		MaxConnections        = c.GetValue<int>("SmtpSettings:MaxConnections"),
@@ -231,7 +230,6 @@ public class SmtpConfigDto
 	public int          BackLog               { get; set; }
 	public string       CertificatePath       { get; set; } = string.Empty;
 	public string       CertificatePassword   { get; set; } = string.Empty;
-	public string       UserStorePath         { get; set; } = string.Empty;
 	public List<string> DnsResolvers          { get; set; } = [];
 	public List<string> LocalDomains          { get; set; } = [];
 	// Connections
