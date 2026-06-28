@@ -43,9 +43,7 @@ public class ConfigService(IWebHostEnvironment env)
 		CertificatePath       = c["SmtpSettings:CertificatePath"] ?? string.Empty,
 		CertificatePassword   = c["SmtpSettings:CertificatePassword"] ?? string.Empty,
 		DnsResolvers          = c.GetSection("SmtpSettings:DnsResolvers").Get<List<string>>() ?? [],
-		LocalDomains          = c.GetSection("SmtpSettings:LocalDomains").Get<List<string>>() ?? [],
 		MaxConnections        = c.GetValue<int>("SmtpSettings:MaxConnections"),
-		WelcomeMessage        = c["SmtpSettings:WelcomeMessage"] ?? string.Empty,
 		MaxMessageSizeKb      = c.GetValue<int>("SmtpSettings:MaxMessageSizeKb"),
 		RetryCount            = c.GetValue<int>("SmtpSettings:RetryCount"),
 		RetryIntervalMinutes  = c.GetValue<int>("SmtpSettings:RetryIntervalMinutes"),
@@ -62,7 +60,6 @@ public class ConfigService(IWebHostEnvironment env)
 		AllowBadLineEndings   = c.GetValue<bool>("SmtpSettings:AllowBadLineEndings"),
 		DisconnectOnTooManyInvalidCommands = c.GetValue<bool>("SmtpSettings:DisconnectOnTooManyInvalidCommands"),
 		MaxInvalidCommands    = c.GetValue<int>("SmtpSettings:MaxInvalidCommands"),
-		BindToLocalIp         = c["SmtpSettings:BindToLocalIp"] ?? string.Empty,
 		MaxRecipientsPerBatch = c.GetValue<int>("SmtpSettings:MaxRecipientsPerBatch"),
 		AddDeliveredToHeader  = c.GetValue<bool>("SmtpSettings:AddDeliveredToHeader"),
 		RuleLoopLimit         = c.GetValue<int>("SmtpSettings:RuleLoopLimit"),
@@ -124,27 +121,37 @@ public class ConfigService(IWebHostEnvironment env)
 
 	// ── Write ───────────────────────────────────────────────
 
-	public void SaveSmtp(SmtpConfigDto dto)            => PatchSection("SmtpSettings", dto);
-	public void SavePop3(Pop3ConfigDto dto)             => PatchSection("Pop3Settings", dto);
-	public void SaveImap(ImapConfigDto dto)             => PatchSection("ImapSettings", dto);
-	public void SaveDmarc(DmarcConfigDto dto)           => PatchSection("DmarcSettings", dto);
-	public void SaveMailbox(MailboxConfigDto dto)       => PatchSection("MailboxSettings", dto);
+	public void SaveSmtpGeneral(SmtpGeneralDto dto)         => PatchFields("SmtpSettings", dto);
+	public void SaveSmtpConnections(SmtpConnectionsDto dto) => PatchFields("SmtpSettings", dto);
+	public void SaveSmtpDelivery(SmtpDeliveryDto dto)       => PatchFields("SmtpSettings", dto);
+	public void SaveSmtpRelay(SmtpRelayDto dto)             => PatchFields("SmtpSettings", dto);
+	public void SaveSmtpSecurity(SmtpSecurityDto dto)       => PatchFields("SmtpSettings", dto);
+	public void SaveSmtpLimits(SmtpLimitsDto dto)           => PatchFields("SmtpSettings", dto);
+	public void SavePop3General(Pop3GeneralDto dto)         => PatchFields("Pop3Settings", dto);
+	public void SavePop3Connections(Pop3ConnectionsDto dto) => PatchFields("Pop3Settings", dto);
+	public void SaveImapGeneral(ImapGeneralDto dto)         => PatchFields("ImapSettings", dto);
+	public void SaveImapConnections(ImapConnectionsDto dto) => PatchFields("ImapSettings", dto);
+	public void SaveImapFolders(ImapFoldersDto dto)         => PatchFields("ImapSettings", dto);
+	public void SaveImapAdvanced(ImapAdvancedDto dto)       => PatchFields("ImapSettings", dto);
+	public void SaveDmarc(DmarcConfigDto dto)               => PatchFields("DmarcSettings", dto);
+	public void SaveMailbox(MailboxConfigDto dto)           => PatchFields("MailboxSettings", dto);
 	public void SaveIpGroups(List<IpGroupDto> dto)                  => PatchSection("IpGroups", dto);
 	public void SaveMaintenanceUsers(List<MaintenanceUserDto> dto)  => PatchSection("MaintenanceUsers", dto);
-	public void SaveGeneral(GeneralSettingsDto dto)
+	public void SaveGeneral(GeneralSettingsDto dto)         => PatchFields("SmtpSettings", dto);
+
+	// Merges only the fields present in dto into the existing section (no data loss).
+	private void PatchFields(string section, object dto)
 	{
-		// stored inside SmtpSettings so SMTP session code reads the same keys
-		var root    = ReadOverride();
-		var smtp    = root["SmtpSettings"]?.AsObject() ?? new System.Text.Json.Nodes.JsonObject();
-		smtp["EmlStoragePath"]        = dto.EmlStoragePath;
-		smtp["CommandTimeoutSeconds"] = dto.CommandTimeoutSeconds;
-		smtp["BackLog"]               = dto.BackLog;
-		smtp["DnsResolvers"]          = System.Text.Json.Nodes.JsonNode.Parse(
-			System.Text.Json.JsonSerializer.Serialize(dto.DnsResolvers, Pretty))!;
-		root["SmtpSettings"] = smtp;
+		var root        = ReadOverride();
+		var existing    = root[section]?.AsObject() ?? new JsonObject();
+		var patch       = JsonNode.Parse(JsonSerializer.Serialize(dto, Pretty))!.AsObject();
+		foreach (var (key, value) in patch)
+			existing[key] = value?.DeepClone();
+		root[section] = existing;
 		File.WriteAllText(OverridePath, root.ToJsonString(Pretty));
 	}
 
+	// Replaces the entire section (used for arrays like IpGroups/MaintenanceUsers).
 	private void PatchSection(string key, object dto)
 	{
 		var root = ReadOverride();
@@ -231,11 +238,8 @@ public class SmtpConfigDto
 	public string       CertificatePath       { get; set; } = string.Empty;
 	public string       CertificatePassword   { get; set; } = string.Empty;
 	public List<string> DnsResolvers          { get; set; } = [];
-	public List<string> LocalDomains          { get; set; } = [];
 	// Connections
 	public int          MaxConnections        { get; set; }
-	// Other
-	public string       WelcomeMessage        { get; set; } = string.Empty;
 	public int          MaxMessageSizeKb      { get; set; }
 	// Delivery
 	public int          RetryCount            { get; set; }
@@ -257,7 +261,6 @@ public class SmtpConfigDto
 	public bool         DisconnectOnTooManyInvalidCommands { get; set; }
 	public int          MaxInvalidCommands    { get; set; }
 	// Advanced
-	public string       BindToLocalIp         { get; set; } = string.Empty;
 	public int          MaxRecipientsPerBatch { get; set; }
 	public bool         AddDeliveredToHeader  { get; set; }
 	public int          RuleLoopLimit         { get; set; }
@@ -357,4 +360,103 @@ public class IpGroupDto
 	public string?       Expires    { get; set; }
 	public IpAccessDto   Access     { get; set; } = new();
 	public EmailFlowsDto EmailFlows { get; set; } = new();
+}
+
+// ── Per-section write DTOs ───────────────────────────────────
+
+public class SmtpGeneralDto
+{
+	public bool   Enabled       { get; set; } = true;
+	public string LocalHostName { get; set; } = string.Empty;
+}
+
+public class SmtpConnectionsDto
+{
+	public int               MaxConnections      { get; set; }
+	public int               MaxMessageSizeKb    { get; set; }
+	public string            CertificatePath     { get; set; } = string.Empty;
+	public string            CertificatePassword { get; set; } = string.Empty;
+	public List<PortConfigDto> Ports             { get; set; } = [];
+}
+
+public class SmtpDeliveryDto
+{
+	public int RetryCount           { get; set; }
+	public int RetryIntervalMinutes { get; set; }
+}
+
+public class SmtpRelayDto
+{
+	public bool   RelayEnabled            { get; set; }
+	public bool   AddDeliveredToHeader    { get; set; }
+	public string RelayHost               { get; set; } = string.Empty;
+	public int    RelayPort               { get; set; }
+	public string RelayQueuePath          { get; set; } = string.Empty;
+	public string RelayConnectionSecurity { get; set; } = "None";
+	public bool   RelayRequiresAuth       { get; set; }
+	public string RelayUsername           { get; set; } = string.Empty;
+	public string RelayPassword           { get; set; } = string.Empty;
+}
+
+public class SmtpSecurityDto
+{
+	public bool AllowPlainTextAuth                    { get; set; }
+	public bool AllowEmptySender                      { get; set; }
+	public bool AllowBadLineEndings                   { get; set; }
+	public bool DisconnectOnTooManyInvalidCommands     { get; set; }
+	public int  MaxInvalidCommands                    { get; set; }
+	public bool EnableAuth                            { get; set; }
+	public bool EnableStartTls                        { get; set; }
+	public bool EnableVrfy                            { get; set; }
+	public bool EnableExpn                            { get; set; }
+	public bool RequireDkim                           { get; set; }
+}
+
+public class SmtpLimitsDto
+{
+	public int MaxRecipientsPerBatch { get; set; }
+	public int RuleLoopLimit         { get; set; }
+	public int MaxRecipientHosts     { get; set; }
+}
+
+public class Pop3GeneralDto
+{
+	public bool   Enabled        { get; set; } = true;
+	public string WelcomeMessage { get; set; } = string.Empty;
+}
+
+public class Pop3ConnectionsDto
+{
+	public int               MaxConnections      { get; set; }
+	public string            CertificatePath     { get; set; } = string.Empty;
+	public string            CertificatePassword { get; set; } = string.Empty;
+	public List<PortConfigDto> Ports             { get; set; } = [];
+}
+
+public class ImapGeneralDto
+{
+	public bool   Enabled        { get; set; } = true;
+	public string WelcomeMessage { get; set; } = string.Empty;
+}
+
+public class ImapConnectionsDto
+{
+	public int               MaxConnections      { get; set; }
+	public string            CertificatePath     { get; set; } = string.Empty;
+	public string            CertificatePassword { get; set; } = string.Empty;
+	public List<PortConfigDto> Ports             { get; set; } = [];
+}
+
+public class ImapFoldersDto
+{
+	public string PublicFolderName   { get; set; } = "# Public";
+	public string HierarchyDelimiter { get; set; } = ".";
+}
+
+public class ImapAdvancedDto
+{
+	public bool EnableSort  { get; set; }
+	public bool EnableQuota { get; set; }
+	public bool EnableIdle  { get; set; }
+	public bool EnableAcl   { get; set; }
 }

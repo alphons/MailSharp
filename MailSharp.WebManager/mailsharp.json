@@ -1,128 +1,210 @@
 {
-  "IpGroups": [
-    {
-      "Name": "LocalNetwork",
-      "Priority": 1,
-      "Cidr": "127.0.0.1/32",
-      "Expires": null,
-      "Access": { "Smtp": true, "Pop3": true, "Imap": true, "AntiSpam": false, "AntiVirus": false, "RequireSslTlsForAuth": false },
-      "EmailFlows": {
-        "LocalToLocal":        { "Allowed": true,  "RequireAuth": false },
-        "LocalToExternal":     { "Allowed": true,  "RequireAuth": false },
-        "ExternalToLocal":     { "Allowed": true,  "RequireAuth": false },
-        "ExternalToExternal":  { "Allowed": true,  "RequireAuth": false }
-      }
-    },
-    {
-      "Name": "TrustedLan",
-      "Priority": 2,
-      "Cidr": "192.168.0.0/16",
-      "Expires": "2026-01-01T00:00:00Z",
-      "Access": { "Smtp": true, "Pop3": true, "Imap": true, "AntiSpam": true, "AntiVirus": true, "RequireSslTlsForAuth": true },
-      "EmailFlows": {
-        "LocalToLocal":        { "Allowed": true,  "RequireAuth": false },
-        "LocalToExternal":     { "Allowed": true,  "RequireAuth": false },
-        "ExternalToLocal":     { "Allowed": true,  "RequireAuth": false },
-        "ExternalToExternal":  { "Allowed": true,  "RequireAuth": true  }
-      }
-    },
-    {
-      "Name": "Remote",
-      "Priority": 3,
-      "Cidr": "0.0.0.0/0",
-      "Expires": null,
-      "Access": { "Smtp": true, "Pop3": false, "Imap": true, "AntiSpam": true, "AntiVirus": true, "RequireSslTlsForAuth": true },
-      "EmailFlows": {
-        "LocalToLocal":        { "Allowed": false, "RequireAuth": true  },
-        "LocalToExternal":     { "Allowed": false, "RequireAuth": true  },
-        "ExternalToLocal":     { "Allowed": true,  "RequireAuth": false },
-        "ExternalToExternal":  { "Allowed": false, "RequireAuth": true  }
-      }
-    }
-  ],
-  "MaintenanceUsers": [
-    {
-      "UserName": "admin",
-      "Password": "admin",
-      "Role": "Administrator",
-      "ExpireDays": 365
-    }
-  ],
-  "SmtpSettings": {
-    "Ports": [
-      { "Host": "0.0.0.0", "Port": 25,  "Security": "None"    },
-      { "Host": "0.0.0.0", "Port": 587, "Security": "StartTls" },
-      { "Host": "0.0.0.0", "Port": 465, "Security": "Tls"      }
-    ],
-    "BackLog": 100,
-    "MaxMessageSize": 10485760,
-    "CommandTimeoutSeconds": 60,
-    "EmlStoragePath": "Emails",
-    "EnableVrfy": false,
-    "EnableExpn": false,
-    "EnableAuth": true,
-    "EnableStartTls": true,
-    "CertificatePath": "certificate.pfx",
-    "CertificatePassword": "yourpassword",
-"RequireDkim": false,
-    "DnsResolvers": [ "8.8.8.8", "8.8.4.4" ],
-    "LocalDomains": [ "example.com", "mijndomein.nl" ],
-    "MaxConnections": 0,
-    "WelcomeMessage": "",
-    "MaxMessageSizeKb": 20480,
-    "RetryCount": 4,
-    "RetryIntervalMinutes": 60,
-    "LocalHostName": "",
-    "RelayEnabled": false,
-    "RelayHost": "",
-    "RelayPort": 25,
-    "RelayRequiresAuth": false,
-    "RelayUsername": "",
-    "RelayPassword": "",
-    "RelayConnectionSecurity": "None",
-    "RelayQueuePath": "RelayQueue",
-    "AllowPlainTextAuth": false,
-    "AllowEmptySender": true,
-    "AllowBadLineEndings": true,
-    "DisconnectOnTooManyInvalidCommands": false,
-    "MaxInvalidCommands": 100,
-    "BindToLocalIp": "",
-    "MaxRecipientsPerBatch": 100,
-    "AddDeliveredToHeader": false,
-    "RuleLoopLimit": 5,
-    "MaxRecipientHosts": 15
-  },
-  "Pop3Settings": {
-    "Ports": [
-      { "Host": "0.0.0.0", "Port": 110, "Security": "None" },
-      { "Host": "0.0.0.0", "Port": 995, "Security": "Tls"  }
-    ],
-    "CertificatePath": "certificate.pfx",
-    "CertificatePassword": "yourpassword",
-    "MaxConnections": 0,
-    "WelcomeMessage": ""
-  },
-  "ImapSettings": {
-    "Ports": [
-      { "Host": "0.0.0.0", "Port": 143, "Security": "StartTls" },
-      { "Host": "0.0.0.0", "Port": 993, "Security": "Tls"       }
-    ],
-    "CertificatePath": "certificate.pfx",
-    "CertificatePassword": "yourpassword",
-    "MaxConnections": 0,
-    "WelcomeMessage": "",
-    "PublicFolderName": "# Public",
-    "EnableSort": true,
-    "EnableQuota": true,
-    "EnableIdle": true,
-    "EnableAcl": true,
-    "HierarchyDelimiter": "."
-  },
-  "DmarcSettings": {
-    "FailOpen": true,
-    "RequireDmarc": false
-  },
-  "MailboxSettings": {
-    "StoragePath": "Mailboxes"
-  }
+	"IpGroups": [
+		{
+			"Name": "LocalNetwork",
+			"Priority": 1,
+			"Cidr": "127.0.0.1/32",
+			"Expires": null,
+			"Access": {
+				"Smtp": true,
+				"Pop3": true,
+				"Imap": true,
+				"AntiSpam": false,
+				"AntiVirus": false,
+				"RequireSslTlsForAuth": false
+			},
+			"EmailFlows": {
+				"LocalToLocal": {
+					"Allowed": true,
+					"RequireAuth": false
+				},
+				"LocalToExternal": {
+					"Allowed": true,
+					"RequireAuth": false
+				},
+				"ExternalToLocal": {
+					"Allowed": true,
+					"RequireAuth": false
+				},
+				"ExternalToExternal": {
+					"Allowed": true,
+					"RequireAuth": false
+				}
+			}
+		},
+		{
+			"Name": "TrustedLan",
+			"Priority": 2,
+			"Cidr": "192.168.0.0/16",
+			"Expires": "2026-01-01T00:00:00Z",
+			"Access": {
+				"Smtp": true,
+				"Pop3": true,
+				"Imap": true,
+				"AntiSpam": true,
+				"AntiVirus": true,
+				"RequireSslTlsForAuth": true
+			},
+			"EmailFlows": {
+				"LocalToLocal": {
+					"Allowed": true,
+					"RequireAuth": false
+				},
+				"LocalToExternal": {
+					"Allowed": true,
+					"RequireAuth": false
+				},
+				"ExternalToLocal": {
+					"Allowed": true,
+					"RequireAuth": false
+				},
+				"ExternalToExternal": {
+					"Allowed": true,
+					"RequireAuth": true
+				}
+			}
+		},
+		{
+			"Name": "Remote",
+			"Priority": 3,
+			"Cidr": "0.0.0.0/0",
+			"Expires": null,
+			"Access": {
+				"Smtp": true,
+				"Pop3": false,
+				"Imap": true,
+				"AntiSpam": true,
+				"AntiVirus": true,
+				"RequireSslTlsForAuth": true
+			},
+			"EmailFlows": {
+				"LocalToLocal": {
+					"Allowed": false,
+					"RequireAuth": true
+				},
+				"LocalToExternal": {
+					"Allowed": false,
+					"RequireAuth": true
+				},
+				"ExternalToLocal": {
+					"Allowed": true,
+					"RequireAuth": false
+				},
+				"ExternalToExternal": {
+					"Allowed": false,
+					"RequireAuth": true
+				}
+			}
+		}
+	],
+	"MaintenanceUsers": [
+		{
+			"UserName": "admin",
+			"Password": "admin",
+			"Role": "Administrator",
+			"ExpireDays": 365
+		}
+	],
+	"SmtpSettings": {
+		"Ports": [
+			{
+				"Host": "0.0.0.0",
+				"Port": 25,
+				"Security": "None"
+			},
+			{
+				"Host": "0.0.0.0",
+				"Port": 587,
+				"Security": "StartTls"
+			},
+			{
+				"Host": "0.0.0.0",
+				"Port": 465,
+				"Security": "Tls"
+			}
+		],
+		"BackLog": 100,
+		"MaxMessageSize": 10485760,
+		"CommandTimeoutSeconds": 60,
+		"EmlStoragePath": "Emails",
+		"EnableVrfy": false,
+		"EnableExpn": false,
+		"EnableAuth": true,
+		"EnableStartTls": true,
+		"CertificatePath": "certificate.pfx",
+		"CertificatePassword": "yourpassword",
+		"RequireDkim": false,
+		"DnsResolvers": [ "8.8.8.8", "8.8.4.4" ],
+		"MaxConnections": 0,
+		"MaxMessageSizeKb": 20480,
+		"RetryCount": 4,
+		"RetryIntervalMinutes": 60,
+		"LocalHostName": "",
+		"RelayEnabled": false,
+		"RelayHost": "",
+		"RelayPort": 25,
+		"RelayRequiresAuth": false,
+		"RelayUsername": "",
+		"RelayPassword": "",
+		"RelayConnectionSecurity": "None",
+		"RelayQueuePath": "RelayQueue",
+		"AllowPlainTextAuth": false,
+		"AllowEmptySender": true,
+		"AllowBadLineEndings": true,
+		"DisconnectOnTooManyInvalidCommands": false,
+		"MaxInvalidCommands": 100,
+		"MaxRecipientsPerBatch": 100,
+		"AddDeliveredToHeader": false,
+		"RuleLoopLimit": 5,
+		"MaxRecipientHosts": 15
+	},
+	"Pop3Settings": {
+		"Ports": [
+			{
+				"Host": "0.0.0.0",
+				"Port": 110,
+				"Security": "None"
+			},
+			{
+				"Host": "0.0.0.0",
+				"Port": 995,
+				"Security": "Tls"
+			}
+		],
+		"CertificatePath": "certificate.pfx",
+		"CertificatePassword": "yourpassword",
+		"MaxConnections": 0,
+		"WelcomeMessage": ""
+	},
+	"ImapSettings": {
+		"Ports": [
+			{
+				"Host": "0.0.0.0",
+				"Port": 143,
+				"Security": "StartTls"
+			},
+			{
+				"Host": "0.0.0.0",
+				"Port": 993,
+				"Security": "Tls"
+			}
+		],
+		"CertificatePath": "certificate.pfx",
+		"CertificatePassword": "yourpassword",
+		"MaxConnections": 0,
+		"WelcomeMessage": "",
+		"PublicFolderName": "# Public",
+		"EnableSort": true,
+		"EnableQuota": true,
+		"EnableIdle": true,
+		"EnableAcl": true,
+		"HierarchyDelimiter": "."
+	},
+	"DmarcSettings": {
+		"FailOpen": true,
+		"RequireDmarc": false
+	},
+	"MailboxSettings": {
+		"StoragePath": "Mailboxes"
+	}
 }

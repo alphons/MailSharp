@@ -265,11 +265,20 @@ async function saveConfig(key)
 {
 	switch (key)
 	{
-		case 'smtp':    return apiFetch('/api/config/smtp',    collectSmtp());
-		case 'pop3':    return apiFetch('/api/config/pop3',    collectPop3());
-		case 'imap':    return apiFetch('/api/config/imap',    collectImap());
-		case 'dmarc':   return apiFetch('/api/config/dmarc',   collectDmarc());
-		case 'general': return apiFetch('/api/config/general', collectGeneral());
+		case 'smtp-general':      return apiFetch('/api/config/smtp/general',      collectSmtpGeneral());
+		case 'smtp-connections':  return apiFetch('/api/config/smtp/connections',  collectSmtpConnections());
+		case 'smtp-delivery':     return apiFetch('/api/config/smtp/delivery',     collectSmtpDelivery());
+		case 'smtp-relay':        return apiFetch('/api/config/smtp/relay',        collectSmtpRelay());
+		case 'smtp-security':     return apiFetch('/api/config/smtp/security',     collectSmtpSecurity());
+		case 'smtp-limits':       return apiFetch('/api/config/smtp/limits',       collectSmtpLimits());
+		case 'pop3-general':      return apiFetch('/api/config/pop3/general',      collectPop3General());
+		case 'pop3-connections':  return apiFetch('/api/config/pop3/connections',  collectPop3Connections());
+		case 'imap-general':      return apiFetch('/api/config/imap/general',      collectImapGeneral());
+		case 'imap-connections':  return apiFetch('/api/config/imap/connections',  collectImapConnections());
+		case 'imap-folders':      return apiFetch('/api/config/imap/folders',      collectImapFolders());
+		case 'imap-advanced':     return apiFetch('/api/config/imap/advanced',     collectImapAdvanced());
+		case 'dmarc':             return apiFetch('/api/config/dmarc',             collectDmarc());
+		case 'general':           return apiFetch('/api/config/general',           collectGeneral());
 	}
 }
 
@@ -278,8 +287,7 @@ async function saveServiceEnabled(svc, enabled)
 	_cfg = null;
 	try
 	{
-		await saveConfig(svc);
-		// Optimistically update dot, then confirm via live status
+		await saveConfig(`${svc}-general`);
 		const el = $id(`tab-${svc}`);
 		if (el)
 		{
@@ -322,10 +330,10 @@ function buildCfgSmtp(s, dmarc)
 				${toggle('smtp-enabled', 'Enable SMTP service', 'Start the SMTP server on startup', s.enabled ?? true)}
 			</div>
 			<div class="form-grid">
-				${field('smtp-welcome', 'Welcome message', s.welcomeMessage)}
+				${field('smtp-localhost', 'Server hostname (used in 220 greeting)', s.localHostName)}
 			</div>
 			<div class="cfg-footer">
-				<button class="btn-save" data-save="smtp">Save SMTP</button>
+				<button class="btn-save" data-save="smtp-general">Save</button>
 				<span class="save-msg" id="msg-smtp"></span>
 			</div>`
 		},
@@ -341,7 +349,7 @@ function buildCfgSmtp(s, dmarc)
 			<p class="cfg-restart-note" style="margin:12px 0">&#9888; restart required after port changes</p>
 			${buildPorts('smtp', s.ports)}
 			<div class="cfg-footer">
-				<button class="btn-save" data-save="smtp">Save SMTP</button>
+				<button class="btn-save" data-save="smtp-connections">Save</button>
 				<span class="save-msg" id="msg-smtp-conn"></span>
 			</div>`
 		},
@@ -351,10 +359,9 @@ function buildCfgSmtp(s, dmarc)
 			<div class="form-grid">
 				${field('smtp-retries',       'Number of retries',           s.retryCount,           'number')}
 				${field('smtp-retryinterval', 'Minutes between every retry', s.retryIntervalMinutes, 'number')}
-				${field('smtp-localhost',     'Local host name',             s.localHostName)}
 			</div>
 			<div class="cfg-footer">
-				<button class="btn-save" data-save="smtp">Save SMTP</button>
+				<button class="btn-save" data-save="smtp-delivery">Save</button>
 				<span class="save-msg" id="msg-smtp-del"></span>
 			</div>`
 		},
@@ -382,7 +389,7 @@ function buildCfgSmtp(s, dmarc)
 				${field('smtp-relaypass', 'Password',  s.relayPassword, 'password')}
 			</div>
 			<div class="cfg-footer">
-				<button class="btn-save" data-save="smtp">Save SMTP</button>
+				<button class="btn-save" data-save="smtp-relay">Save</button>
 				<span class="save-msg" id="msg-smtp-rel"></span>
 			</div>`
 		},
@@ -414,7 +421,7 @@ function buildCfgSmtp(s, dmarc)
 				</div>
 			</div>
 			<div class="cfg-footer">
-				<button class="btn-save" data-save="smtp">Save SMTP</button>
+				<button class="btn-save" data-save="smtp-security">Save</button>
 				<span class="save-msg" id="msg-smtp-sec"></span>
 			</div>`
 		},
@@ -427,7 +434,7 @@ function buildCfgSmtp(s, dmarc)
 				${field('smtp-maxrechosts',   'Max recipient hosts',         s.maxRecipientHosts,     'number')}
 			</div>
 			<div class="cfg-footer">
-				<button class="btn-save" data-save="smtp">Save SMTP</button>
+				<button class="btn-save" data-save="smtp-limits">Save</button>
 				<span class="save-msg" id="msg-smtp-lim"></span>
 			</div>`
 		},
@@ -439,7 +446,7 @@ function buildCfgSmtp(s, dmarc)
 				${toggle('dmarc-require',  'Require DMARC', 'Reject mail that fails DMARC policy', dmarc.requireDmarc)}
 			</div>
 			<div class="cfg-footer">
-				<button class="btn-save" data-save="dmarc">Save DMARC</button>
+				<button class="btn-save" data-save="dmarc">Save</button>
 				<span class="save-msg" id="msg-dmarc"></span>
 			</div>`
 		}
@@ -463,7 +470,7 @@ function buildCfgPop3(s)
 				${field('pop3-welcome', 'Welcome message', s.welcomeMessage)}
 			</div>
 			<div class="cfg-footer">
-				<button class="btn-save" data-save="pop3">Save POP3</button>
+				<button class="btn-save" data-save="pop3-general">Save</button>
 				<span class="save-msg" id="msg-pop3"></span>
 			</div>`
 		},
@@ -478,7 +485,7 @@ function buildCfgPop3(s)
 			<p class="cfg-restart-note" style="margin:12px 0">&#9888; restart required after port changes</p>
 			${buildPorts('pop3', s.ports)}
 			<div class="cfg-footer">
-				<button class="btn-save" data-save="pop3">Save POP3</button>
+				<button class="btn-save" data-save="pop3-connections">Save</button>
 				<span class="save-msg" id="msg-pop3-conn"></span>
 			</div>`
 		}
@@ -506,7 +513,7 @@ function buildCfgImap(s)
 				${field('imap-welcome', 'Welcome message', s.welcomeMessage)}
 			</div>
 			<div class="cfg-footer">
-				<button class="btn-save" data-save="imap">Save IMAP</button>
+				<button class="btn-save" data-save="imap-general">Save</button>
 				<span class="save-msg" id="msg-imap"></span>
 			</div>`
 		},
@@ -521,7 +528,7 @@ function buildCfgImap(s)
 			<p class="cfg-restart-note" style="margin:12px 0">&#9888; restart required after port changes</p>
 			${buildPorts('imap', s.ports)}
 			<div class="cfg-footer">
-				<button class="btn-save" data-save="imap">Save IMAP</button>
+				<button class="btn-save" data-save="imap-connections">Save</button>
 				<span class="save-msg" id="msg-imap-conn"></span>
 			</div>`
 		},
@@ -536,7 +543,7 @@ function buildCfgImap(s)
 				<select id="imap-delim">${delimOpts}</select>
 			</div>
 			<div class="cfg-footer">
-				<button class="btn-save" data-save="imap">Save IMAP</button>
+				<button class="btn-save" data-save="imap-folders">Save</button>
 				<span class="save-msg" id="msg-imap-fold"></span>
 			</div>`
 		},
@@ -550,7 +557,7 @@ function buildCfgImap(s)
 				${toggle('imap-acl',   'IMAP ACL',   'Enable ACL extension',   s.enableAcl)}
 			</div>
 			<div class="cfg-footer">
-				<button class="btn-save" data-save="imap">Save IMAP</button>
+				<button class="btn-save" data-save="imap-advanced">Save</button>
 				<span class="save-msg" id="msg-imap-adv"></span>
 			</div>`
 		}
@@ -601,71 +608,117 @@ function buildPorts(prefix, ports)
 
 // ── Collectors ─────────────────────────────────────────────
 
-function collectSmtp()
+// ── Per-section collectors ─────────────────────────────────
+
+function collectSmtpGeneral()
+{
+	return { enabled: chk('smtp-enabled'), localHostName: val('smtp-localhost') };
+}
+
+function collectSmtpConnections()
 {
 	return {
-		enabled:               chk('smtp-enabled'),
-		welcomeMessage:        val('smtp-welcome'),
-		certificatePath:       val('smtp-certpath'),
-		certificatePassword:   val('smtp-certpass'),
-		maxConnections:        int('smtp-maxconn'),
-		maxMessageSizeKb:      int('smtp-maxmsg'),
-		retryCount:            int('smtp-retries'),
-		retryIntervalMinutes:  int('smtp-retryinterval'),
-		localHostName:         val('smtp-localhost'),
-		relayEnabled:          chk('smtp-relay'),
-		addDeliveredToHeader:  chk('smtp-deliveredto'),
-		relayHost:             val('smtp-relayhost'),
-		relayPort:             int('smtp-relayport'),
-		relayQueuePath:        val('smtp-relayqueue'),
-		relayRequiresAuth:     chk('smtp-relayauth'),
-		relayUsername:         val('smtp-relayuser'),
-		relayPassword:         val('smtp-relaypass'),
+		maxConnections:     int('smtp-maxconn'),
+		maxMessageSizeKb:   int('smtp-maxmsg'),
+		certificatePath:    val('smtp-certpath'),
+		certificatePassword: val('smtp-certpass'),
+		ports:              collectPorts('smtp')
+	};
+}
+
+function collectSmtpDelivery()
+{
+	return {
+		retryCount:           int('smtp-retries'),
+		retryIntervalMinutes: int('smtp-retryinterval')
+	};
+}
+
+function collectSmtpRelay()
+{
+	return {
+		relayEnabled:            chk('smtp-relay'),
+		addDeliveredToHeader:    chk('smtp-deliveredto'),
+		relayHost:               val('smtp-relayhost'),
+		relayPort:               int('smtp-relayport'),
+		relayQueuePath:          val('smtp-relayqueue'),
 		relayConnectionSecurity: val('smtp-relaysec'),
-		allowPlainTextAuth:    chk('smtp-plainauth'),
-		allowEmptySender:      chk('smtp-emptysender'),
-		allowBadLineEndings:   chk('smtp-badlineends'),
+		relayRequiresAuth:       chk('smtp-relayauth'),
+		relayUsername:           val('smtp-relayuser'),
+		relayPassword:           val('smtp-relaypass')
+	};
+}
+
+function collectSmtpSecurity()
+{
+	return {
+		allowPlainTextAuth:                chk('smtp-plainauth'),
+		allowEmptySender:                  chk('smtp-emptysender'),
+		allowBadLineEndings:               chk('smtp-badlineends'),
 		disconnectOnTooManyInvalidCommands: chk('smtp-discbadcmds'),
-		maxInvalidCommands:    int('smtp-maxbadcmds'),
+		maxInvalidCommands:                int('smtp-maxbadcmds'),
+		enableAuth:                        chk('smtp-auth'),
+		enableStartTls:                    chk('smtp-starttls'),
+		enableVrfy:                        chk('smtp-vrfy'),
+		enableExpn:                        chk('smtp-expn'),
+		requireDkim:                       chk('smtp-dkim')
+	};
+}
+
+function collectSmtpLimits()
+{
+	return {
 		maxRecipientsPerBatch: int('smtp-maxrecipients'),
 		ruleLoopLimit:         int('smtp-ruleloop'),
-		maxRecipientHosts:     int('smtp-maxrechosts'),
-		enableAuth:            chk('smtp-auth'),
-		enableStartTls:        chk('smtp-starttls'),
-		enableVrfy:            chk('smtp-vrfy'),
-		enableExpn:            chk('smtp-expn'),
-		requireDkim:           chk('smtp-dkim'),
-		ports:                 collectPorts('smtp')
+		maxRecipientHosts:     int('smtp-maxrechosts')
 	};
 }
 
-function collectPop3()
+function collectPop3General()
+{
+	return { enabled: chk('pop3-enabled'), welcomeMessage: val('pop3-welcome') };
+}
+
+function collectPop3Connections()
 {
 	return {
-		enabled:             chk('pop3-enabled'),
-		certificatePath:     val('pop3-certpath'),
+		maxConnections:     int('pop3-maxconn'),
+		certificatePath:    val('pop3-certpath'),
 		certificatePassword: val('pop3-certpass'),
-		ports:               collectPorts('pop3'),
-		maxConnections:      int('pop3-maxconn'),
-		welcomeMessage:      val('pop3-welcome')
+		ports:              collectPorts('pop3')
 	};
 }
 
-function collectImap()
+function collectImapGeneral()
+{
+	return { enabled: chk('imap-enabled'), welcomeMessage: val('imap-welcome') };
+}
+
+function collectImapConnections()
 {
 	return {
-		enabled:             chk('imap-enabled'),
-		certificatePath:     val('imap-certpath'),
+		maxConnections:     int('imap-maxconn'),
+		certificatePath:    val('imap-certpath'),
 		certificatePassword: val('imap-certpass'),
-		ports:               collectPorts('imap'),
-		maxConnections:      int('imap-maxconn'),
-		welcomeMessage:      val('imap-welcome'),
-		publicFolderName:    val('imap-publicfolder'),
-		enableSort:          chk('imap-sort'),
-		enableQuota:         chk('imap-quota'),
-		enableIdle:          chk('imap-idle'),
-		enableAcl:           chk('imap-acl'),
-		hierarchyDelimiter:  val('imap-delim')
+		ports:              collectPorts('imap')
+	};
+}
+
+function collectImapFolders()
+{
+	return {
+		publicFolderName:   val('imap-publicfolder'),
+		hierarchyDelimiter: val('imap-delim')
+	};
+}
+
+function collectImapAdvanced()
+{
+	return {
+		enableSort:  chk('imap-sort'),
+		enableQuota: chk('imap-quota'),
+		enableIdle:  chk('imap-idle'),
+		enableAcl:   chk('imap-acl')
 	};
 }
 

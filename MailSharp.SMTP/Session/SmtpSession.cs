@@ -125,7 +125,9 @@ public partial class SmtpSession
 		using (reader)
 		using (writer)
 		{
-			await writer.WriteLineAsync(configuration["SmtpResponses:Ready"], cancellationToken);
+			var hostname = configuration["SmtpSettings:LocalHostName"]?.Trim();
+			if (string.IsNullOrEmpty(hostname)) hostname = System.Net.Dns.GetHostName();
+			await writer.WriteLineAsync($"220 {hostname} ESMTP", cancellationToken);
 			int timeoutSeconds = configuration.GetValue<int>("SmtpSettings:CommandTimeoutSeconds");
 
 			using (logger.BeginScope(new Dictionary<string, object> { ["SessionId"] = sessionId }))

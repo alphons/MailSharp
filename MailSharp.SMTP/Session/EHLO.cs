@@ -15,7 +15,6 @@ public partial class SmtpSession
 		}
 		state = SmtpState.HeloReceived;
 		await writer.WriteLineAsync(configuration["SmtpResponses:EhloSupport"], ct);
-		await writer.WriteLineAsync(string.Format(configuration["SmtpResponses:EhloSizeFormat"]!, configuration.GetValue<long>("SmtpSettings:MaxMessageSize")), ct);
 		if (configuration.GetValue<bool>("SmtpSettings:EnableAuth"))
 		{
 			await writer.WriteLineAsync(configuration["SmtpResponses:AuthSupport"], ct);
@@ -25,5 +24,7 @@ public partial class SmtpSession
 		{
 			await writer.WriteLineAsync(configuration["SmtpResponses:StartTlsSupport"], ct);
 		}
+		// always end as latest 250 <space> SIZE 123 
+		await writer.WriteLineAsync(string.Format(configuration["SmtpResponses:EhloSizeFormat"]!, configuration.GetValue<long>("SmtpSettings:MaxMessageSize")), ct);
 	}
 }
