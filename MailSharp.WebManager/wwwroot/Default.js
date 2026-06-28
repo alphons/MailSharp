@@ -330,7 +330,7 @@ function buildCfgSmtp(s, dmarc)
 				${toggle('smtp-enabled', 'Enable SMTP service', 'Start the SMTP server on startup', s.enabled ?? true)}
 			</div>
 			<div class="form-grid">
-				${field('smtp-localhost', 'Server hostname (used in 220 greeting)', s.localHostName)}
+				${field('smtp-localhost', 'Server hostname (greeting)', s.localHostName)}
 			</div>
 			<div class="cfg-footer">
 				<button class="btn-save" data-save="smtp-general">Save</button>
