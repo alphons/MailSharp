@@ -10,12 +10,6 @@ public partial class SmtpSession
 	// Handle STARTTLS command
 	private async Task HandleStartTlsAsync(string[] parts, string line, CancellationToken ct)
 	{
-		if (!configuration.GetValue<bool>("SmtpSettings:EnableStartTls"))
-		{
-			await writer.WriteLineAsync(configuration["SmtpResponses:CommandNotRecognized"], ct);
-			return;
-		}
-
 		if (state != SmtpState.HeloReceived)
 		{
 			await writer.WriteLineAsync(configuration["SmtpResponses:BadSequence"], ct);
@@ -37,11 +31,9 @@ public partial class SmtpSession
 
 			SslStream sslStream = new(stream, false);
 			await sslStream.AuthenticateAsServerAsync(certificate, false, System.Security.Authentication.SslProtocols.Tls12 | System.Security.Authentication.SslProtocols.Tls13, false);
-			this.reader?.Dispose();
-			this.writer?.Dispose();
 			this.stream = sslStream;
-			this.reader = new StreamReader(this.stream, Encoding.ASCII);
-			this.writer = new StreamWriter(this.stream, Encoding.ASCII) { AutoFlush = true };
+			this.reader = new StreamReader(sslStream, Encoding.ASCII, false, -1, leaveOpen: true);
+			this.writer = new StreamWriter(sslStream, Encoding.ASCII, -1, leaveOpen: true) { AutoFlush = true };
 
 			// Reset session as per RFC 3207
 			state = SmtpState.Initial;
@@ -49,8 +41,9 @@ public partial class SmtpSession
 			rcptTo.Clear();
 			data.Clear();
 		}
-		catch
+		catch(Exception exception)
 		{
+			logger.LogError(exception, "HandleStartTlsAsync failed");
 			await writer.WriteLineAsync(configuration["SmtpResponses:StartTlsFailed"], ct);
 			state = SmtpState.HeloReceived;
 		}

@@ -110,7 +110,7 @@
 			{
 				"Host": "0.0.0.0",
 				"Port": 25,
-				"Security": "None"
+				"Security": "StartTlsOptional"
 			},
 			{
 				"Host": "0.0.0.0",
@@ -129,10 +129,8 @@
 		"EmlStoragePath": "Emails",
 		"EnableVrfy": false,
 		"EnableExpn": false,
-		"EnableAuth": true,
-		"EnableStartTls": true,
 		"CertificatePath": "certificate.pfx",
-		"CertificatePassword": "yourpassword",
+		"CertificatePassword": "PFXPassword",
 		"RequireDkim": false,
 		"DnsResolvers": [ "8.8.8.8", "8.8.4.4" ],
 		"MaxConnections": 0,

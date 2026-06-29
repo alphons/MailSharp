@@ -35,8 +35,6 @@ public class ConfigService(IWebHostEnvironment env)
 		EmlStoragePath        = c["SmtpSettings:EmlStoragePath"] ?? string.Empty,
 		CommandTimeoutSeconds = c.GetValue<int>("SmtpSettings:CommandTimeoutSeconds"),
 		BackLog               = c.GetValue<int>("SmtpSettings:BackLog"),
-		EnableAuth            = c.GetValue<bool>("SmtpSettings:EnableAuth"),
-		EnableStartTls        = c.GetValue<bool>("SmtpSettings:EnableStartTls"),
 		EnableVrfy            = c.GetValue<bool>("SmtpSettings:EnableVrfy"),
 		EnableExpn            = c.GetValue<bool>("SmtpSettings:EnableExpn"),
 		RequireDkim           = c.GetValue<bool>("SmtpSettings:RequireDkim"),
@@ -266,8 +264,6 @@ public class SmtpConfigDto
 	public int          RuleLoopLimit         { get; set; }
 	public int          MaxRecipientHosts     { get; set; }
 	// Auth / DKIM
-	public bool         EnableAuth            { get; set; }
-	public bool         EnableStartTls        { get; set; }
 	public bool         EnableVrfy            { get; set; }
 	public bool         EnableExpn            { get; set; }
 	public bool         RequireDkim           { get; set; }
@@ -405,8 +401,6 @@ public class SmtpSecurityDto
 	public bool AllowBadLineEndings                   { get; set; }
 	public bool DisconnectOnTooManyInvalidCommands     { get; set; }
 	public int  MaxInvalidCommands                    { get; set; }
-	public bool EnableAuth                            { get; set; }
-	public bool EnableStartTls                        { get; set; }
 	public bool EnableVrfy                            { get; set; }
 	public bool EnableExpn                            { get; set; }
 	public bool RequireDkim                           { get; set; }

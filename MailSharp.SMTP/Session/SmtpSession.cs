@@ -38,6 +38,7 @@ public partial class SmtpSession
 	private Stream stream;
 	private readonly Dictionary<string, Func<string[], string, CancellationToken, Task>> commandHandlers = [];
 	private static long nextSessionId = 0;
+	private IpGroup? ipGroup;
 	private readonly DkimSigner dkimSigner;
 	private readonly SpfChecker spfChecker;
 	private readonly DkimVerifier dkimVerifier;
@@ -125,6 +126,16 @@ public partial class SmtpSession
 		using (reader)
 		using (writer)
 		{
+			var clientEndPoint = (System.Net.IPEndPoint?)client.Client.RemoteEndPoint;
+			var groups = configuration.GetSection("IpGroups").Get<List<IpGroup>>() ?? [];
+			ipGroup = clientEndPoint != null ? IpGroupMatcher.Match(groups, clientEndPoint.Address) : null;
+
+			if (ipGroup == null || !ipGroup.Access.Smtp)
+			{
+				await writer.WriteLineAsync("554 No access from your IP address", cancellationToken);
+				return;
+			}
+
 			var hostname = configuration["SmtpSettings:LocalHostName"]?.Trim();
 			if (string.IsNullOrEmpty(hostname)) hostname = System.Net.Dns.GetHostName();
 			await writer.WriteLineAsync($"220 {hostname} ESMTP", cancellationToken);

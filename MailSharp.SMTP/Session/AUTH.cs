@@ -11,7 +11,8 @@ public partial class SmtpSession
 	// Handle AUTH command
 	private async Task HandleAuthAsync(string[] parts, string line, CancellationToken ct)
 	{
-		if (!configuration.GetValue<bool>("SmtpSettings:EnableAuth"))
+		bool tlsActive = security == SecurityEnum.Tls || state == SmtpState.TlsStarted;
+		if (ipGroup == null || (ipGroup.Access.RequireSslTlsForAuth && !tlsActive))
 		{
 			await writer.WriteLineAsync(configuration["SmtpResponses:CommandNotRecognized"], ct);
 			return;

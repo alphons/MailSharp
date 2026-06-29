@@ -13,18 +13,16 @@ public partial class SmtpSession
 			await writer.WriteLineAsync(configuration["SmtpResponses:BadSequence"], ct);
 			return;
 		}
+		bool tlsActive = security == SecurityEnum.Tls || state == SmtpState.TlsStarted;
 		state = SmtpState.HeloReceived;
 		await writer.WriteLineAsync(configuration["SmtpResponses:EhloSupport"], ct);
-		if (configuration.GetValue<bool>("SmtpSettings:EnableAuth"))
-		{
+		bool authAllowed = ipGroup != null && (!ipGroup.Access.RequireSslTlsForAuth || tlsActive);
+		if (authAllowed)
 			await writer.WriteLineAsync(configuration["SmtpResponses:AuthSupport"], ct);
-		}
-		// Advertise STARTTLS based on port security, not the global flag
+
 		if (security == SecurityEnum.StartTlsOptional || security == SecurityEnum.StartTls)
-		{
 			await writer.WriteLineAsync(configuration["SmtpResponses:StartTlsSupport"], ct);
-		}
-		// always end as latest 250 <space> SIZE 123 
+
 		await writer.WriteLineAsync(string.Format(configuration["SmtpResponses:EhloSizeFormat"]!, configuration.GetValue<long>("SmtpSettings:MaxMessageSize")), ct);
 	}
 }

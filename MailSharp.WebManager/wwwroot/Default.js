@@ -412,8 +412,6 @@ function buildCfgSmtp(s, dmarc)
 				<div class="ipg-group">
 					<div class="ipg-group__legend">Auth / DKIM</div>
 					<div class="toggle-list">
-						${toggle('smtp-auth',     'Enable AUTH',     'Allow SMTP authentication',     s.enableAuth)}
-						${toggle('smtp-starttls', 'Enable STARTTLS', 'Advertise STARTTLS in EHLO',    s.enableStartTls)}
 						${toggle('smtp-vrfy',     'Enable VRFY',     'Allow address verification',    s.enableVrfy)}
 						${toggle('smtp-expn',     'Enable EXPN',     'Allow mailing list expansion',  s.enableExpn)}
 						${toggle('smtp-dkim',     'Require DKIM',    'Reject mail without valid DKIM',s.requireDkim)}
@@ -657,8 +655,6 @@ function collectSmtpSecurity()
 		allowBadLineEndings:               chk('smtp-badlineends'),
 		disconnectOnTooManyInvalidCommands: chk('smtp-discbadcmds'),
 		maxInvalidCommands:                int('smtp-maxbadcmds'),
-		enableAuth:                        chk('smtp-auth'),
-		enableStartTls:                    chk('smtp-starttls'),
 		enableVrfy:                        chk('smtp-vrfy'),
 		enableExpn:                        chk('smtp-expn'),
 		requireDkim:                       chk('smtp-dkim')
